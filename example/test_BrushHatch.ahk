@@ -1,4 +1,4 @@
-; Script     testBrushHatch.ahk
+; Script     test_BrushHatch.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
