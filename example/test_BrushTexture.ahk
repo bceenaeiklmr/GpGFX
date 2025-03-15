@@ -1,4 +1,4 @@
-; Script     testBrushTexture.ahk
+; Script     test_BrushTexture.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
