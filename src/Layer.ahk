@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 ; Layers class contains the layers objects data.
 class Layers {
@@ -50,7 +50,7 @@ class Layer {
         ; After some tests it seems its faster to pass the shape ids as a string        
         VarSetStrCapacity(&str,
             ; (obj count * Shape's id length + pipe) * 2
-            ObjOwnPropCount(Shapes.%this.id%) * StrLen(Shape.id) * (2+1))
+            ObjOwnPropCount(Shapes.%this.id%) * StrLen(Shape.id) * (2 + 1))
 
         ; Calculate the bounds of the layer
         for k, v in Shapes.%this.id%.OwnProps() {
@@ -79,9 +79,10 @@ class Layer {
         
         ; Calculate the width and height of the layer, drawing outside of the DIB section will cause an error
         E := 0
-        this.width  := (w := x2 - x1) <= DIBw ? w : (E += 1, DIBw) ; TODO can be outside of the monitor area
+        this.width  := (w := x2 - x1) <= DIBw ? w : (E += 1, DIBw) ; TODO: can be outside of the monitor area
         this.height := (h := y2 - y1) <= DIBh ? h : (E += 2, DIBh)
         switch E {
+            ; This happens when the shapes are outside of the DIB section
             case 1: OutputDebug("[!] Increase DIBw`n")
             case 2: OutputDebug("[!] Increase DIBh`n")
             case 3: OutputDebug("[!] Increase DIBw and DIBh`n")
@@ -108,6 +109,15 @@ class Layer {
         this.w := w
         this.h := h
         this.Prepare()
+        return this
+    }
+
+    Move(x?, y?) {
+        if (IsSet(x))
+            this.x := x
+        if (IsSet(y))
+            this.y := y
+        WinMove(x?, y?, , , this.hwnd)
         return this
     }
 
@@ -157,7 +167,7 @@ class Layer {
         tmpLayer := Layer(this.x, this.y, this.w, this.h)
        
         ; Shapes, with indicator text
-        rect1 := Rectangle(0, 0, this.w, this.h, 'blue')
+        rect1 := Rectangle(0, 0, this.w, this.h, "blue")
         rect2 := Rectangle(this.x1, this.y1, this.width, this.height, "red", filled)
         rect1.Text("Layer DIB size", "black", 42)
         rect2.Text("Layer used size", "black", 21)
@@ -171,14 +181,16 @@ class Layer {
     }
 
     ; Layer-window visibility, and accessiblity methods
+    ; In some cases Clickthrough, AlwaysOnTop, TopMost can be useful
+    ; Hide, Show, ShowHide effects the layer, you can avoid draw this way
     ; credit: iseahound
     Show() {
-        DllCall('ShowWindow', 'ptr', this.hwnd, 'int', 4) ; NA - No Activate
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", 4) ; NA - No Activate
         this.visible := 1
     }
 
     Hide() {
-        DllCall('ShowWindow', 'ptr', this.hwnd, 'int', 0) ; SW_HIDE - Hide
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", 0) ; SW_HIDE - Hide
         this.visible := 0
     }
 
@@ -227,17 +239,17 @@ class Layer {
     ; Clears the layer by setting the alpha to zero
     ; credit: iseahound
     Clean() {
-        DllCall('UpdateLayeredWindow'
-            ,    'ptr', this.hWnd            ; hWnd
-            ,    'ptr', 0                    ; hdcDst
-            ,    'ptr', 0                    ; *pptDst
-            ,    'ptr', 0                    ; *psize
-            ,    'ptr', 0                    ; hdcSrc
-            ,    'ptr', 0                    ; *pptSrc
-            ,   'uint', 0                    ; crKey
-            ,  'uint*', 0 << 16 | 0x01 << 24 ; *pblend
-            ,   'uint', 2                    ; dwFlags
-            ,    'int')                      ; Success = 1
+        DllCall("UpdateLayeredWindow"
+            ,    "ptr", this.hWnd            ; hWnd
+            ,    "ptr", 0                    ; hdcDst
+            ,    "ptr", 0                    ; *pptDst
+            ,    "ptr", 0                    ; *psize
+            ,    "ptr", 0                    ; hdcSrc
+            ,    "ptr", 0                    ; *pptSrc
+            ,   "uint", 0                    ; crKey
+            ,  "uint*", 0 << 16 | 0x01 << 24 ; *pblend
+            ,   "uint", 2                    ; dwFlags
+            ,    "int")                      ; Success = 1
     }
 
     ;{ Property setters
@@ -285,7 +297,7 @@ class Layer {
 
         local props, getter, setter
 
-        ; Swap x, y params with w, h, enable auto-centering
+        ; Width, height provided as x and y, auto-center
         if (IsSet(x) && IsSet(y) && !IsSet(w) && !IsSet(h)) {
             w := x
             h := y
@@ -405,6 +417,6 @@ class Layer {
                 n := (IsSet(n)) ? n + 1 : 1
             }
         }
-        (IsSet(n)) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ''
+        (IsSet(n)) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ""
     }
 }
