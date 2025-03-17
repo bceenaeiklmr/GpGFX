@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * The `Pen` class represents a drawing pen used to draw lines and shapes.  
@@ -262,19 +262,19 @@ class LinearGradientBrush extends Brush {
      * Creates a new LinearGradientBrush object with the specified colors and mode.
      * @param foreARGB 
      * @param backARGB 
-     * @param {int} LinearGradientMode 
-     * @param {int} WrapMode 
+     * @param {int} gradMode 
+     * @param {int} wrapMode 
      * @param {int} pRectF 
      */
-    __New(foreARGB, backARGB, LinearGradientMode := 1, wrapMode := 1, pRectF := 0) {
-        this.LinearGradientMode(&linearGradientMode)
+    __New(foreARGB, backARGB, gradMode := 1, wrapMode := 1, pRectF := 0) {
+        this.LinearGradientMode(&gradMode)
         DllCall("gdiplus\GdipCreateLineBrushFromRect"
-            ,  "ptr", pRectF             ; pointer to rect structure 
-            ,  "int", foreARGB           ; foreground ARGB
-            ,  "int", backARGB           ; background ARGB
-            ,  "int", linearGradientMode ; LinearGradientMode
-            ,  "int", wrapMode           ; WrapMode
-            , "ptr*", &LGpBrush:=0)      ; pointer to the LinearGradientBrush
+            ,  "ptr", pRectF        ; pointer to rect structure 
+            ,  "int", foreARGB      ; foreground ARGB
+            ,  "int", backARGB      ; background ARGB
+            ,  "int", gradMode      ; LinearGradientMode
+            ,  "int", wrapMode      ; WrapMode
+            , "ptr*", &LGpBrush:=0) ; pointer to the LinearGradientBrush
         this.ptr := LGpBrush
         this.type := 4
         OutputDebug("[+] LinearGradientBrush created " LGpBrush "`n")
