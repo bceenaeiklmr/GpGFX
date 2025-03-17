@@ -2,15 +2,15 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /** Returnsn a ARGB with 0xFF alpha.
  * @returns {int}
  */
 RandomARGB() => Random(0xFF000000, 0xFFFFFFFF)
 
-/** Returns a ARGB with a provided alpha
+/** Returns a ARGB with a provided alpha.
  * @param {int} alpha
  * @returns {int}
  */
@@ -65,7 +65,7 @@ Welcome(delay := .5) {
  * @param {float} delay * 1000 ms, timeout
  * @return {void}
  */
-GoodBye(delay := .5) {
+GoodBye(delay := .25) {
 
     local lyr, rect
 
@@ -82,7 +82,8 @@ GoodBye(delay := .5) {
     rect.Text(, "white", 24)
 
     Clean()
-    loop parse, systext.goodbye {
+    ;loop parse, systext.goodbye {
+    loop parse, "exiting..." {
         rect.str .= A_LoopField
         if (A_LoopField !== "`n")
             Sleep(10)
@@ -97,7 +98,7 @@ GoodBye(delay := .5) {
 }
 
 /**
- * Clean all layers
+ * Clean all layers.
  * @return {void}
  * credit: iseahound
  */
@@ -128,7 +129,7 @@ IsBool(int) {
 }
 
 /**
- * Check if the value is a number
+ * Check if the value is a number.
  * @param {int} 
  * @return {bool}
  */
@@ -137,7 +138,7 @@ IsAlphaNum(int) {
 }
 
 /**
- * Validate an ARGB value
+ * Validate an ARGB value.
  * @param ARGB 
  */
 IsARGB(ARGB) {
@@ -150,7 +151,7 @@ IsARGB(ARGB) {
 }
 
 /**
- * Convert an int to ARGB
+ * Convert an int to ARGB.
  * @param {int} 
  * @return {str}
  * Slightly performs better than Format("{:08X}", int)
@@ -163,14 +164,14 @@ itoARGB(int) {
 }
 
 /**
- * Alias for itoARGB, convert an int to ARGB
+ * Alias for itoARGB, convert an int to ARGB.
  * @param {int} 
  * @return {str}
  */
 intToARGB(int) => itoARGB(int)
 
 /**
- * Position enumerations
+ * Position enumerations.
  * @param {int|str} n
  * @return {int} position index
  * TODO: later
