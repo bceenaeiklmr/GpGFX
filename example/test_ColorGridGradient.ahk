@@ -2,23 +2,27 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
+; Date       17.03.2025
 
 #include ../src/GpGFX.ahk
 
 /**
- * Gradient color, filling a grid of rectangles 1 by 1
+ * Gradient color, filling a grid of 100 rectangles 1 by 1.
+ * With delay, without delay.
  */
-TestGradientRects()
+TestGradientRects(10)
 
+TestGradientRects(-1)
 
-TestGradientRects() {
+End()
+
+TestGradientRects(sleeptime := 10) {
 
     local lyr, obj
 
     ; Create a layer and a grid of rectangles
     lyr := Layer()
-    obj := CreateGraphicsObjectGrid(3, 12, 0, 0, 100, 100)
+    obj := CreateGraphicsObject(12, 12, , , 50, 50)
 
     ; Enable overdraw on the layer since the positions are static
     lyr.Redraw := 1
@@ -27,9 +31,8 @@ TestGradientRects() {
     loop obj.Length { 
         obj[A_Index].color := ["15410f", "Lime"]
         Render.Layer(lyr)
-        Sleep(10)
+        Sleep(sleeptime)
     }
 
     Fps.Display()
-    End()
 }
