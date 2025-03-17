@@ -2,7 +2,7 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
+; Date       17.03.2025
 
 #include ../src/GpGFX.ahk
 
@@ -23,7 +23,7 @@ testHatchBrush() {
     objH := 100
 
     ; Create a grid of rectangles and change their colors
-    rect := CreateGraphicsObjectGrid(row, col, , , objW, objH, pad)
+    rect := CreateGraphicsObject(row, col, , , objW, objH, pad)
     loop rect.Length {
         if (A_Index < HatchBrush.Style.Length) {
             rect[A_Index].color := ["hatch", Color.Random("Red|Orange|Blue"), 0x0, A_Index]
@@ -55,7 +55,7 @@ testRandomColor() {
     ; Create a layer and a grid of rectangles
     main := Layer()
     pad := 5
-    rect := CreateGraphicsObjectGrid(5, 11,,, 66, 66, pad)
+    rect := CreateGraphicsObject(5, 11,,, 66, 66, pad)
 
     ; Set the middle one as a status box
     middle := 2 * 11 + 6
@@ -105,7 +105,7 @@ testHatchBrushColor() {
     objW := 125
     objH := 125
     pad := 5
-    rect := CreateGraphicsObjectGrid(6, 8, , , objW, objH, pad)
+    rect := CreateGraphicsObject(6, 8, , , objW, objH, pad)
     Pies := []
     
     loop rect.Length {
