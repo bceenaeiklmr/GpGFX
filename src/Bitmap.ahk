@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * Represents a Gdiplus Bitmap class that can be used for drawing images.
@@ -11,7 +11,7 @@
 class Bitmap {
 
     /**
-     * Creates a bitmap object with the specified width and height.
+     * Creates a bitmap with the specified width and height.
      * @param width the width of the bitmap
      * @param height the height of the bitmap 
      */
@@ -20,7 +20,7 @@ class Bitmap {
                     ,  "int", width        ; width of the bitmap
                     ,  "int", height       ; height
                     ,  "int", 0            ; stride (width) in bytes
-                    ,  "int", 0xE200B      ; PixelFormat32bppPARGB) pre multiplied alpha
+                    ,  "int", 0xE200B      ; PixelFormat32bppPARGB pre multiplied alpha
                     ,  "ptr", 0            ; scan0 pointer to the pixel data
                     , "ptr*", &pBitmap:=0) ; pointer to a pBitmap object
         this.ptr := pBitmap
@@ -51,7 +51,7 @@ class Bitmap {
     /**
      * Loads a bitmap from a file and stores it in the class's instance variables.
      * It can also perform resizing and color matrix operations on the bitmap if requested.
-     * @param {str} filepath path to the image file.
+     * @param {str} filepath path to the image file
      * @param {int|str} option percentage or width and height of the new bitmap
      * @param {str} cmatrix color matrix to apply to the image
      */
@@ -69,7 +69,7 @@ class Bitmap {
 
     /**
      * Resizes a bitmap, by specifying new width and height or by a percentage. Optionally applies color attributes.
-     * @param {int|str} option percentage or width and height of the new bitmap.
+     * @param {int|str} option percentage or width and height of the new bitmap
      * @param {str} cmatrix color matrix to apply to the image
      */
     Resize(option, cmatrix := 0) {
@@ -124,7 +124,7 @@ class Bitmap {
                     , "int", 0)         ; ColorMatrixFlags flags
         }
 
-        ; Draw the original bitmap on the new bitmap using GdipDrawImageRectRectI.
+        ; Draw the original bitmap on the new bitmap using GdipDrawImageRectRectI
         DllCall("gdiplus\GdipDrawImageRectRectI"
                     , "ptr", gfx        ; pointer to the temp graphics
                     , "ptr", this.ptr   ; pointer to the orig bitmap
