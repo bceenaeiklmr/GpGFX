@@ -22,7 +22,7 @@ TestColorChangeVivid(row := 1, col := 1) {
     clr := []
     clr.Capacity := rect.Length
     loop clr.Capacity
-        clr.Push(Color.GetTransition('Red|Orange|Yellow', 'Blue|Lime|Purple'))
+        clr.Push(Color.GetTransition("Red|Orange|Yellow", "Blue|Lime|Purple"))
 
     changes := 3
     distmax := 100
