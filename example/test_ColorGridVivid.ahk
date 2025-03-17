@@ -2,7 +2,7 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
+; Date       17.03.2025
 
 #include ../src/GpGFX.ahk
 
@@ -16,13 +16,13 @@ TestColorChangeVivid(row := 1, col := 1) {
 
     ; Create layer, rects
     main := Layer(1280, 720)
-    rect := CreateGraphicsObjectGrid(row, col)
+    rect := CreateGraphicsObject(row, col)
 
     ; Preload colors
     clr := []
     clr.Capacity := rect.Length
     loop clr.Capacity
-        clr.Push(Color.GetTransation('Red|Orange|Yellow', 'Blue|Lime|Purple'))
+        clr.Push(Color.GetTransition('Red|Orange|Yellow', 'Blue|Lime|Purple'))
 
     changes := 3
     distmax := 100
