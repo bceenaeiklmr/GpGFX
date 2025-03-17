@@ -2,12 +2,11 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
- * The following functions are just tests and examples, will be reworked later.
- * Does the job for now.
+ * The following functions are just tests and examples and will be reworked later.
  */
 
 ; Normal parameter getter
