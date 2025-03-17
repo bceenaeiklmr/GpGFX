@@ -1,8 +1,8 @@
-; Script     test_ColorSmoothTransation.ahk
+; Script     test_ColorSmoothTransition.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
+; Date       17.03.2025
 
 #include ../src/GpGFX.ahk
 
@@ -15,7 +15,7 @@
 lyr1 := Layer(1280, 720)
 
 ; Call the func that creates its own layer
-TestColorSmoothTransation()
+TestColorSmoothTransition()
 
 ; The rectangle will be created on the first layer
 rect := Rectangle(0, 0, 1280, 720, "5d16e473")
@@ -26,13 +26,13 @@ Sleep(1000)
 
 End(1)
 
-TestColorSmoothTransation() {
+TestColorSmoothTransition() {
 
     local lyr, rect, colors, changes, dist, distmax
 
     ; Create a layer and some rectangles
     lyr := Layer()
-    rect := CreateGraphicsObject(7, 1, 0, 200, 200, 5)
+    rect := CreateGraphicsObject(1, 7, , 200, 200, 200)
 
     ; Preload colors
     colors := []
@@ -41,7 +41,7 @@ TestColorSmoothTransation() {
     loop rect.Length {
         color1 := "2ba3b3"
         color2 := Color.Random("Green", variance)
-        colors.Push(Color.GetTransation(color1, color2, true))
+        colors.Push(Color.GetTransition(color1, color2, true))
     }
 
     changes := 1
