@@ -2,7 +2,7 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
+; Date       17.03.2025
 
 #include ../src/GpGFX.ahk
 
@@ -46,7 +46,7 @@ BrushTexture() {
     resize := 90
 
     ; Create the object grid
-    rect := CreateGraphicsObjectGrid(row, col, , , objW, objH, pad)
+    rect := CreateGraphicsObject(row, col, , , objW, objH, pad)
 
     ; Fill the objects with random colors or with the texture brush
     loop rect.Length {
