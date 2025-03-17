@@ -2,15 +2,15 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * The Fps class provides a simple way to display the frames per second on the screen.
  * The class is designed to be used with the Render class, which will create a temporary
  * layer for the fps panel. The fps panel can be positioned on the screen and updated
  * with the latest values. The panel can be removed immediately or at the end of the script.
- * Important: if the panel is persistent, user need to call End() when the script ends.
+ * Important: if the panel is persistent, the user needs to call End() when the script ends.
  */
 class Fps {
 
@@ -22,7 +22,7 @@ class Fps {
         this.Layer := 0
         this.Shape := 0
         
-        ; Requried for the fps calculation
+        ; Required for the fps calculation
         this.frames := 0
         this.frametime := 0
         this.lasttick := 0
@@ -62,7 +62,7 @@ class Fps {
             this.Layer := Layer(, , this.w, this.h)
             this.Shape := Rectangle(, , this.w, this.h, "black")
 
-            ; Can be overriden via Fps.pos := value
+            ; Can be overridden via Fps.pos := value
             this.Position(this.pos)
 
             ; Set the back the id
