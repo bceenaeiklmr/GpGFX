@@ -2,14 +2,13 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * Wanted to say thank you for everyone who contributes to the AHK community.
- * 
  * @credit iseahound: Graphics, Textrender, ImagePut
- * https://github.com/iseahound thank you for your work.
+ *         https://github.com/iseahound thank you for your work.
  * 
  * @credit tic: for creating the Gdip library  (Gdip)
  * @credit for contributing to the library https://github.com/mmikeww/AHKv2-Gdip
@@ -17,14 +16,13 @@
  *         let me know if I missed someone. Thank you guys.
  * 
  * Special thanks to: GeekDude, mcl, mikeyww, neogna2, robodesign, SKAN, Helgef.
- * 
  * Finally, Lexikos for creating and maintaining AutoHotkey v2.
  */
 
 ; Users should include this file (GpGFX.ahk) in their scripts to use GpGFX.
 ; See the examples for further information.
 
-#Requires AutoHotkey >=2.0.18
+#Requires AutoHotkey v2
 #Warn
 
 #include Bitmap.ahk
@@ -56,16 +54,16 @@ OutputDebug("[i] GpGFX started...`n")
 
 
 ; Global hotkeys:
-; Note: Any hotkey will hang the script. (TODO: later)
-;       Needs a customized exit routine.
-; ^esc::ExitApp
+; Note: Any hotkey will hang the script. Use with caution.
+; I recommend using hotkeys in the other script, that includes GpGFX.ahk.
+;^esc::ExitApp
 
 
 ; Release resources on program exit
 ExitFn(*) {
     ; A bit overkill, but does the job for now, layer and especially fonts
-    ; didn't not get deleted properly.
-    GoodBye()
+    ; didn't not get deleted properly in some cases.
+    ;GoodBye() ; Comment this line out if you want to see the exit message
     Fps.__Delete()
     Font.__Delete()
     Layer.__Delete()
@@ -84,7 +82,7 @@ class Gdip {
     /**
      * Starts up Gdiplus and initializes the Gdiplus token.
      * 
-     * Depracated: https://www.autohotkey.com/boards/viewtopic.php?t=72011
+     * Deprecated: https://www.autohotkey.com/boards/viewtopic.php?t=72011
      * recommended by Helgef. (AutoHotkey preloads the Gdiplus library)  
      * 
      *	if !DllCall('GetModuleHandle', 'str', 'gdiplus', 'uptr')
@@ -105,7 +103,7 @@ class Gdip {
     /**
      * Shuts down Gdiplus.  
      * 
-     * The load library part was removed.
+     * The load library part was removed, free library is not needed.
      * @info recommended by Helgef. Link above.
      *   
      *	if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
