@@ -2,11 +2,11 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 class Shapes {
-    ; This class store the shapes data for the drawing process.
+    ; This class stores the shape data for the drawing process.
     ; Prototype and __Init are removed for faster lookup.
     ; TODO: implement static __Get and __Set to make it not accessible for the user
 }
@@ -26,81 +26,8 @@ set_ShapePoint(name, offset, this, value) {
     return Shapes.%this.LayerId%.%this.id%.%name% := value
 }
 
-; Note, grids positioning behaves incosistently, needs rework.
-; Auto centering works though.
-
 /**
- * Creates a graphics object with specified parameters.  
- * @param   {int}   obj type of graphics object to create.
- * @param   {str}   x X-coordinate position (optional).
- * @param   {str}   y Y-coordinate position (optional).
- * @param   {int}   w width of the graphics object (default is 128).
- * @param   {int}   h height of the graphics object (default is 128).
- * @param   {int}   padding padding around the graphics object (default is 25).
- * @param   {str}   orientation orientation of the graphics object ("LeftRight" by default).
- * @returns {array} an array representing the graphics object.
- */
-CreateGraphicsObject(obj := 1, x := 0, y := 0, w := 0, h:= 0, pad := 25, orientation := "LeftRight", colour := 0xFF000000) {
-
-    local bx, by
-    local width := Layers.%Layer.Activeid%.w
-    local height := Layers.%Layer.Activeid%.h
-    local arr := []
-
-    ; Check if the specified width and height fit within the screen dimensions
-    if (w && obj * (w + pad) - pad > width)
-        w := 0
-    if (h && obj * (h + pad) - pad > height)
-        h := 0
-
-    ; Calculate width and height for squares if not provided or if they are too large
-    if (!w && !h) {
-        if orientation = "LeftRight" || orientation = "RightLeft" {
-            w := h := (width - (pad * (obj - 1))) // obj
-        }
-        else {
-            w := h := (height - (pad * (obj - 1))) // obj
-        }
-
-        ; Ensure width and height are equal for squares
-        if (w != h) {
-            w := h := Min(w, h)
-        }
-    }
-    else if (!w) {
-        w := h
-    }
-    else if (!h) {
-        h := w
-    }
-
-    ; Calculate base positions for centering
-    bx := (width - (obj * w + (obj - 1) * pad)) // 2
-    by := (height - (obj * h + (obj - 1) * pad)) // 2
-
-    loop obj {
-        switch orientation {
-            Case "TopBottom":
-                x := (width - w) // 2
-                y := by + (A_Index - 1) * (h + pad) + (pad + h) // 2
-            Case "BottomTop":
-                x := (width - w) // 2
-                y := by + (obj - A_Index) * (h + pad) - (pad + h) // 2
-            Case "LeftRight":
-                x := bx + (A_Index - 1) * (w + pad) + (pad + w) // 2
-                y := (height - h) // 2
-            Case "RightLeft":
-                x := bx + (obj - A_Index) * (w + pad) - (pad + w) // 2
-                y := (height - h) // 2
-        }
-        arr.Push(Rectangle(x, y, w, h, Colour))
-    }
-
-    return arr
-}
-
-/**
- * Create a grid of graphics objects with specified parameters.
+ * Create a grid of shapes with specified parameters.
  * @param {int} row number of rows in the grid
  * @param {int} col number of columns in the grid
  * @param {int} x   X-coordinate position (optional)
@@ -110,14 +37,14 @@ CreateGraphicsObject(obj := 1, x := 0, y := 0, w := 0, h:= 0, pad := 25, orienta
  * @param {int} pad padding around the grid objects (default is 25)
  * @returns {array}
  */
-CreateGraphicsObjectGrid(row := 3, col := 3, x := 0, y := 0, w := 0, h := 0, pad := 25, colour := 0xFF000000) {
+CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colour := 0xFF000000) {
 
     local totalWidth, totalHeight
     local width := Layers.%Layer.Activeid%.w
     local height := Layers.%Layer.Activeid%.h
     local obj := []
 
-    ; Calculate width and height for squares if not provided or if they are too large
+    ; Calculate width and height for objects if not provided or if they are too large
     if (!w && !h) {
         w := (width - (col + 1) * pad) // col
         h := (height - (row + 1) * pad) // row
@@ -127,7 +54,7 @@ CreateGraphicsObjectGrid(row := 3, col := 3, x := 0, y := 0, w := 0, h := 0, pad
             w := h := Min(w, h)
         }
     }
-    ; Calculate width, height if they are not provided
+    ; Calculate width, and height if they are not provided
     else if (!w) {
         w := (width - (col + 1) * pad) // col
     }
@@ -136,23 +63,28 @@ CreateGraphicsObjectGrid(row := 3, col := 3, x := 0, y := 0, w := 0, h := 0, pad
     }
 
     ; Calculate total grid dimensions
-    totalWidth := col * w + (col + 1) * pad
-    totalHeight := row * h + (row + 1) * pad
+    totalWidth := col * w + (col - 1) * pad
+    totalHeight := row * h + (row - 1) * pad
 
     ; Calculate base positions for centering if x or y are not specified
-    if (!x)
-        x := (width - totalWidth) // 2
-    if (!y)
-        y := (height - totalHeight) // 2
+    if (!IsSet(x))
+        baseX := (width - totalWidth) // 2
+    else
+        baseX := x
 
-    ; Create grid of objects
+    if (!IsSet(y))
+        baseY := (height - totalHeight) // 2
+    else
+        baseY := y
+
+    ; Create objects
     loop row {
         i := A_Index
         loop col {
             j := A_Index
-            objx := x + j * (w + pad) - w
-            objy := y + i * (h + pad) - h
-            obj.Push(Rectangle(objx, objy, w, h, Colour))
+            objx := baseX + (j - 1) * (w + pad)
+            objy := baseY + (i - 1) * (h + pad)
+            obj.Push(Rectangle(objx, objy, w, h, colour))
         }
     }
     return obj
@@ -169,7 +101,7 @@ CreateGraphicsObjectGrid(row := 3, col := 3, x := 0, y := 0, w := 0, h := 0, pad
 class Shape {
 
     /**
-     * Allows to insert text onto the shape using the specified parameters.  
+     * Allows to insert of text onto the shape using the specified parameters.  
      * @param {str} str     text
      * @param {clr} colour  font color
      * @param {int} size    font size
@@ -237,7 +169,7 @@ class Shape {
      * @param {int} w new width of the shape (opt)
      * @param {int} h new height of the shape (opt)
      */
-    Move(x?, y?, w?, h?) { ; TODO: only works wih xywh shapes; implement + -
+    Move(x?, y?, w?, h?) { ; TODO: only works with xywh shapes; implement + -
         IsSet(x) ? this.x := Type(x) !== "Integer" ? Integer(x) : x : ""
         IsSet(y) ? this.y := Type(x) !== "Integer" ? Integer(y) : y : ""
         IsSet(w) ? this.w := Type(x) !== "Integer" ? Integer(w) : w : ""
@@ -247,7 +179,7 @@ class Shape {
     /**
      * Adds an image to the shape.
      * @param {str} filepath file path to an existing image
-     * @param {str} option percentage or width, height (opt), by default the image is resized to fit the shape
+     * @param {str} option percentage or width, height (opt), by default, the image is resized to fit the shape
      * @param {str} effect color matrix name (opt)
      * @param {str} x coordinate (opt)
      * @param {str} y coordinate (opt)
@@ -264,7 +196,7 @@ class Shape {
             obj.Bitmap := ""
         }
 
-        ; Try to squaze the image into the shape if no option is provided
+        ; Try to squeeze the image into the shape if no option is provided
         if (!option) {
             if (this.w != this.h) {
                 if (this.w > this.h)
@@ -317,11 +249,11 @@ class Shape {
         if (this.Shape ~= "^Bezier|Line|Point")
             return
         
-        ; Create an invisible text control on the layer gui
+        ; Create an invisible text control on the layer GUI
         this.Ctrl := Layers.%this.LayerId%.Window.AddText(
             "X" this.x " Y" this.y " W" this.w " H" this.h)
         
-        ; The layer maybe not prepared yet, could raise an error
+        ; The layer may not be prepared yet, which could raise an error
         try this.CtrlUpdate()
         this.Ctrl.OnEvent(event, (*) => (fn)(params*))
         return
@@ -338,13 +270,46 @@ class Shape {
     }
 
     ; Bind a function to the shape object
-    ; Experimental function, unfortunately the params has to provided
+    ; Experimental function, unfortunately, the params has to be provided
     ; Signals are executed during each layer preparation.
     Signal(fn, params*) {
         this.hasSignal := true
-        this.fn := fn.Bind(, params*) ; ;this.Fn := (*) => (fn)(params*) ;fn.Bind()
+        if !params.Length {
+            this.Fn := (*) => (fn)(this)
+        } else {
+            this.Fn := (*) => (fn)(this, params*)
+        }
+        ;this.fn := fn.Bind(this, params*) ;ObjBindMethod(this, fn, params*) ; nope
+        ;this.Fn := (*) => (fn)(params*) ; nada
         return
     }
+
+    /**
+	 * Sets the position of the object.
+	 * @param {str} x position, or 'center' to center horizontally.
+	 * @param {str} y position, or 'center' to center vertically.
+	 */
+	Position(x := 'center', y := 'center') {
+		if Type(x) == 'String' || Type(y) == 'String' {
+			if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
+				this.x := (this.layerWidth - this.w) // 2
+				this.y := (this.layerHeight - this.h) // 2
+			} else if x ~= 'i)c(ent(er)?)?' {
+				this.x := (this.layerWidth - this.w) // 2
+				this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
+			} else if y ~= 'i)c(ent(er)?)?' {
+				this.y := (this.layerHeight - this.h) // 2
+				this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
+			}
+		} else if IsInteger(x) && IsInteger(y) {
+			this.x := x
+			this.y := y
+		} else if IsFloat(x) && IsFloat(y) {
+			this.x := Ceil(x)
+			this.y := Ceil(y)
+		} else
+			throw Error('Invalid value for x and y position is not allowed. (integer or float or wording)')
+	}
 
     LayerWidth {
         get => Layers.%this.layerid%.w
@@ -382,10 +347,10 @@ class Shape {
     setReferenceObj(obj) {
         return Shapes.%this.Layerid%.%this.id% := {
             id : this.id,
-            Alpha: 0xFF,
+            alpha: 0xFF,
             Bitmap : {ptr:0},
-            Color: (obj.colour) ? obj.colour : Color(),
-            Filled: obj.filled,
+            color: obj.colour,
+            filled: obj.filled,
             Font : Font.getStock()
         }
     }
@@ -508,7 +473,7 @@ class Shape {
 
         if (this.shape ~= "Triangle|Polygon|Beziers|Lines") {
             
-            ; Create a buffer for the points struct, store the pointer
+            ; Create a buffer for the points struct, and store the pointer
             this.points := obj.points.Length // 2
             this.bPoints := Buffer(8 * this.points)
             this.pPoints := this.bPoints.ptr
@@ -536,7 +501,7 @@ class Shape {
                 this.%yname% := obj.points[yindex]
             }
 
-            ; Bind function to get the unique bounds
+            ; Bind a function to get the unique bounds
             if (this.shape == "Triangle" || this.shape == "FilledTriangle") {
                 ref.getBounds := getBoundsTriangle.Bind()
             }
@@ -561,19 +526,19 @@ class Shape {
      */
     __New(obj) {
 
-        ; Check if the active layer exist (user can delete it).
+        ; Check if the active layer exists (the user can delete it).
         if (!Layers.HasOwnProp(Layer.activeid))
             throw ValueError("[?] The current active layer doesn't exist.")
 
         this.layerid := Layer.activeid
         this.id := id := ++Shape.id
 
-        ; Some properties depends on others during initialization, so we need to set them first
+        ; Some properties depend on others during initialization, so we need to set them first
         this.setMissingProp(&obj)
         this.setReferenceObj(obj)
         this.InitializeTool(&obj)
 
-        ; Add unique properties The following shapes requires additional properties for handling position from a buffer
+        ; Add unique properties The following shapes require additional properties for handling position from a buffer
         props := this.getProperties(obj)
         this.addSupplementaryProps(&obj, &props)       
         this.setBaseProps(props)
@@ -682,8 +647,14 @@ class Shape {
             if (value.Length == 2) {
 
                 value[1] := Color(value[1])
-                value[2] := Color(value[2])           
-                
+                value[2] := Color(value[2])
+
+                ; It's gradient
+                if (tooltype == 4) {
+                    obj.Tool.color := [value[1], value[2]]
+                    return
+                }
+
                 value.InsertAt(1, "")
                     tooltype := 4
             }
@@ -714,8 +685,6 @@ class Shape {
                     return
                 ; Gradient
                 case 4:
-                    value[2] := Color(value[2])
-                    value[3] := Color(value[3])
                     LinearGradientMode := (value.Has(4)) ? value[4] : 0
                     WrapMode := (value.Has(5)) ? value[5] : 1
                     RectF := Buffer(16)
@@ -751,7 +720,7 @@ class Shape {
         clr := obj.Tool.Color
         obj.Tool := ""
 
-        ; It's a switch back from gradient to pen
+        ; It's a switchback from gradient to pen
         if (Type(clr) == "Array") {
             clr := Random(0xFF000000, 0xFFFFFFFF)
         }
