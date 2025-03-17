@@ -1,13 +1,12 @@
-; Script     GpGFX.ahk
+; Script     GpGFX_standalone.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * Wanted to say thank you for everyone who contributes to the AHK community.
- * 
  * @credit iseahound: Graphics, Textrender, ImagePut
  * 		   https://github.com/iseahound thank you for your work.
  * 
@@ -17,14 +16,13 @@
  *         let me know if I missed someone. Thank you guys.
  * 
  * Special thanks to: GeekDude, mcl, mikeyww, neogna2, robodesign, SKAN, Helgef.
- * 
  * Finally, Lexikos for creating and maintaining AutoHotkey v2.
  */
 
 ; Users should include this file (GpGFX.ahk) in their scripts to use GpGFX.
 ; See the examples for further information.
 
-#Requires AutoHotkey >=2.0.18
+#Requires AutoHotkey v2
 #Warn
 
 #DllLoad Gdiplus.dll ; preload the Gdiplus library
@@ -44,16 +42,16 @@ OutputDebug("[i] GpGFX started...`n")
 
 
 ; Global hotkeys:
-; Note: Any hotkey will hang the script. (TODO: later)
-;       Needs a customized exit routine.
-; ^esc::ExitApp
+; Note: Any hotkey will hang the script. Use with caution.
+; I recommend using hotkeys in the other script, that includes GpGFX.ahk.
+;^esc::ExitApp
 
 
 ; Release resources on program exit
 ExitFn(*) {
     ; A bit overkill, but does the job for now, layer and especially fonts
-    ; didn't not get deleted properly.
-    GoodBye()
+    ; didn't not get deleted properly in some cases.
+    ;GoodBye() ; Comment out this line if you want to see the exit message
     Fps.__Delete()
     Font.__Delete()
     Layer.__Delete()
@@ -93,7 +91,7 @@ class Gdip {
     /**
      * Shuts down Gdiplus.  
      * 
-     * The load library part was removed.
+     * The load library part was removed, free library is not needed.
      * @info recommended by Helgef. Link above.
      *   
      *	if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
@@ -150,7 +148,7 @@ class Layer {
         ; After some tests it seems its faster to pass the shape ids as a string        
         VarSetStrCapacity(&str,
             ; (obj count * Shape's id length + pipe) * 2
-            ObjOwnPropCount(Shapes.%this.id%) * StrLen(Shape.id) * (2+1))
+            ObjOwnPropCount(Shapes.%this.id%) * StrLen(Shape.id) * (2 + 1))
 
         ; Calculate the bounds of the layer
         for k, v in Shapes.%this.id%.OwnProps() {
@@ -179,9 +177,10 @@ class Layer {
         
         ; Calculate the width and height of the layer, drawing outside of the DIB section will cause an error
         E := 0
-        this.width  := (w := x2 - x1) <= DIBw ? w : (E += 1, DIBw) ; TODO can be outside of the monitor area
+        this.width  := (w := x2 - x1) <= DIBw ? w : (E += 1, DIBw) ; TODO: can be outside of the monitor area
         this.height := (h := y2 - y1) <= DIBh ? h : (E += 2, DIBh)
         switch E {
+            ; This happens when the shapes are outside of the DIB section
             case 1: OutputDebug("[!] Increase DIBw`n")
             case 2: OutputDebug("[!] Increase DIBh`n")
             case 3: OutputDebug("[!] Increase DIBw and DIBh`n")
@@ -208,6 +207,15 @@ class Layer {
         this.w := w
         this.h := h
         this.Prepare()
+        return this
+    }
+
+    Move(x?, y?) {
+        if (IsSet(x))
+            this.x := x
+        if (IsSet(y))
+            this.y := y
+        WinMove(x?, y?, , , this.hwnd)
         return this
     }
 
@@ -257,7 +265,7 @@ class Layer {
         tmpLayer := Layer(this.x, this.y, this.w, this.h)
        
         ; Shapes, with indicator text
-        rect1 := Rectangle(0, 0, this.w, this.h, 'blue')
+        rect1 := Rectangle(0, 0, this.w, this.h, "blue")
         rect2 := Rectangle(this.x1, this.y1, this.width, this.height, "red", filled)
         rect1.Text("Layer DIB size", "black", 42)
         rect2.Text("Layer used size", "black", 21)
@@ -271,14 +279,16 @@ class Layer {
     }
 
     ; Layer-window visibility, and accessiblity methods
+    ; In some cases Clickthrough, AlwaysOnTop, TopMost can be useful
+    ; Hide, Show, ShowHide effects the layer, you can avoid draw this way
     ; credit: iseahound
     Show() {
-        DllCall('ShowWindow', 'ptr', this.hwnd, 'int', 4) ; NA - No Activate
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", 4) ; NA - No Activate
         this.visible := 1
     }
 
     Hide() {
-        DllCall('ShowWindow', 'ptr', this.hwnd, 'int', 0) ; SW_HIDE - Hide
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", 0) ; SW_HIDE - Hide
         this.visible := 0
     }
 
@@ -327,17 +337,17 @@ class Layer {
     ; Clears the layer by setting the alpha to zero
     ; credit: iseahound
     Clean() {
-        DllCall('UpdateLayeredWindow'
-            ,    'ptr', this.hWnd            ; hWnd
-            ,    'ptr', 0                    ; hdcDst
-            ,    'ptr', 0                    ; *pptDst
-            ,    'ptr', 0                    ; *psize
-            ,    'ptr', 0                    ; hdcSrc
-            ,    'ptr', 0                    ; *pptSrc
-            ,   'uint', 0                    ; crKey
-            ,  'uint*', 0 << 16 | 0x01 << 24 ; *pblend
-            ,   'uint', 2                    ; dwFlags
-            ,    'int')                      ; Success = 1
+        DllCall("UpdateLayeredWindow"
+            ,    "ptr", this.hWnd            ; hWnd
+            ,    "ptr", 0                    ; hdcDst
+            ,    "ptr", 0                    ; *pptDst
+            ,    "ptr", 0                    ; *psize
+            ,    "ptr", 0                    ; hdcSrc
+            ,    "ptr", 0                    ; *pptSrc
+            ,   "uint", 0                    ; crKey
+            ,  "uint*", 0 << 16 | 0x01 << 24 ; *pblend
+            ,   "uint", 2                    ; dwFlags
+            ,    "int")                      ; Success = 1
     }
 
     ;{ Property setters
@@ -385,7 +395,7 @@ class Layer {
 
         local props, getter, setter
 
-        ; Swap x, y params with w, h, enable auto-centering
+        ; Width, height provided as x and y, auto-center
         if (IsSet(x) && IsSet(y) && !IsSet(w) && !IsSet(h)) {
             w := x
             h := y
@@ -505,7 +515,7 @@ class Layer {
                 n := (IsSet(n)) ? n + 1 : 1
             }
         }
-        (IsSet(n)) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ''
+        (IsSet(n)) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ""
     }
 }
 
@@ -530,81 +540,8 @@ set_ShapePoint(name, offset, this, value) {
     return Shapes.%this.LayerId%.%this.id%.%name% := value
 }
 
-; Note, grids positioning behaves incosistently, needs rework.
-; Auto centering works though.
-
 /**
- * Creates a graphics object with specified parameters.  
- * @param   {int}   obj type of graphics object to create.
- * @param   {str}   x X-coordinate position (optional).
- * @param   {str}   y Y-coordinate position (optional).
- * @param   {int}   w width of the graphics object (default is 128).
- * @param   {int}   h height of the graphics object (default is 128).
- * @param   {int}   padding padding around the graphics object (default is 25).
- * @param   {str}   orientation orientation of the graphics object ("LeftRight" by default).
- * @returns {array} an array representing the graphics object.
- */
-CreateGraphicsObject(obj := 1, x := 0, y := 0, w := 0, h:= 0, pad := 25, orientation := "LeftRight", colour := 0xFF000000) {
-
-    local bx, by
-    local width := Layers.%Layer.Activeid%.w
-    local height := Layers.%Layer.Activeid%.h
-    local arr := []
-
-    ; Check if the specified width and height fit within the screen dimensions
-    if (w && obj * (w + pad) - pad > width)
-        w := 0
-    if (h && obj * (h + pad) - pad > height)
-        h := 0
-
-    ; Calculate width and height for squares if not provided or if they are too large
-    if (!w && !h) {
-        if orientation = "LeftRight" || orientation = "RightLeft" {
-            w := h := (width - (pad * (obj - 1))) // obj
-        }
-        else {
-            w := h := (height - (pad * (obj - 1))) // obj
-        }
-
-        ; Ensure width and height are equal for squares
-        if (w != h) {
-            w := h := Min(w, h)
-        }
-    }
-    else if (!w) {
-        w := h
-    }
-    else if (!h) {
-        h := w
-    }
-
-    ; Calculate base positions for centering
-    bx := (width - (obj * w + (obj - 1) * pad)) // 2
-    by := (height - (obj * h + (obj - 1) * pad)) // 2
-
-    loop obj {
-        switch orientation {
-            Case "TopBottom":
-                x := (width - w) // 2
-                y := by + (A_Index - 1) * (h + pad) + (pad + h) // 2
-            Case "BottomTop":
-                x := (width - w) // 2
-                y := by + (obj - A_Index) * (h + pad) - (pad + h) // 2
-            Case "LeftRight":
-                x := bx + (A_Index - 1) * (w + pad) + (pad + w) // 2
-                y := (height - h) // 2
-            Case "RightLeft":
-                x := bx + (obj - A_Index) * (w + pad) - (pad + w) // 2
-                y := (height - h) // 2
-        }
-        arr.Push(Rectangle(x, y, w, h, Colour))
-    }
-
-    return arr
-}
-
-/**
- * Create a grid of graphics objects with specified parameters.
+ * Create a grid of shapes with specified parameters.
  * @param {int} row number of rows in the grid
  * @param {int} col number of columns in the grid
  * @param {int} x   X-coordinate position (optional)
@@ -614,14 +551,14 @@ CreateGraphicsObject(obj := 1, x := 0, y := 0, w := 0, h:= 0, pad := 25, orienta
  * @param {int} pad padding around the grid objects (default is 25)
  * @returns {array}
  */
-CreateGraphicsObjectGrid(row := 3, col := 3, x := 0, y := 0, w := 0, h := 0, pad := 25, colour := 0xFF000000) {
+CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colour := 0xFF000000) {
 
     local totalWidth, totalHeight
     local width := Layers.%Layer.Activeid%.w
     local height := Layers.%Layer.Activeid%.h
     local obj := []
 
-    ; Calculate width and height for squares if not provided or if they are too large
+    ; Calculate width and height for objects if not provided or if they are too large
     if (!w && !h) {
         w := (width - (col + 1) * pad) // col
         h := (height - (row + 1) * pad) // row
@@ -640,23 +577,28 @@ CreateGraphicsObjectGrid(row := 3, col := 3, x := 0, y := 0, w := 0, h := 0, pad
     }
 
     ; Calculate total grid dimensions
-    totalWidth := col * w + (col + 1) * pad
-    totalHeight := row * h + (row + 1) * pad
+    totalWidth := col * w + (col - 1) * pad
+    totalHeight := row * h + (row - 1) * pad
 
     ; Calculate base positions for centering if x or y are not specified
-    if (!x)
-        x := (width - totalWidth) // 2
-    if (!y)
-        y := (height - totalHeight) // 2
+    if (!IsSet(x))
+        baseX := (width - totalWidth) // 2
+    else
+        baseX := x
 
-    ; Create grid of objects
+    if (!IsSet(y))
+        baseY := (height - totalHeight) // 2
+    else
+        baseY := y
+
+    ; Create objects
     loop row {
         i := A_Index
         loop col {
             j := A_Index
-            objx := x + j * (w + pad) - w
-            objy := y + i * (h + pad) - h
-            obj.Push(Rectangle(objx, objy, w, h, Colour))
+            objx := baseX + (j - 1) * (w + pad)
+            objy := baseY + (i - 1) * (h + pad)
+            obj.Push(Rectangle(objx, objy, w, h, colour))
         }
     }
     return obj
@@ -846,9 +788,42 @@ class Shape {
     ; Signals are executed during each layer preparation.
     Signal(fn, params*) {
         this.hasSignal := true
-        this.fn := fn.Bind(, params*) ; ;this.Fn := (*) => (fn)(params*) ;fn.Bind()
+        if !params.Length {
+            this.Fn := (*) => (fn)(this)
+        } else {
+            this.Fn := (*) => (fn)(this, params*)
+        }
+        ;this.fn := fn.Bind(this, params*) ;ObjBindMethod(this, fn, params*) ; nope
+        ;this.Fn := (*) => (fn)(params*) ; nada
         return
     }
+
+    /**
+	 * Sets the position of the object.
+	 * @param {str} x position, or 'center' to center horizontally.
+	 * @param {str} y position, or 'center' to center vertically.
+	 */
+	Position(x := 'center', y := 'center') {
+		if Type(x) == 'String' || Type(y) == 'String' {
+			if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
+				this.x := (this.layerWidth - this.w) // 2
+				this.y := (this.layerHeight - this.h) // 2
+			} else if x ~= 'i)c(ent(er)?)?' {
+				this.x := (this.layerWidth - this.w) // 2
+				this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
+			} else if y ~= 'i)c(ent(er)?)?' {
+				this.y := (this.layerHeight - this.h) // 2
+				this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
+			}
+		} else if IsInteger(x) && IsInteger(y) {
+			this.x := x
+			this.y := y
+		} else if IsFloat(x) && IsFloat(y) {
+			this.x := Ceil(x)
+			this.y := Ceil(y)
+		} else
+			throw Error('Invalid value for x and y position is not allowed. (integer or float or wording)')
+	}
 
     LayerWidth {
         get => Layers.%this.layerid%.w
@@ -886,10 +861,10 @@ class Shape {
     setReferenceObj(obj) {
         return Shapes.%this.Layerid%.%this.id% := {
             id : this.id,
-            Alpha: 0xFF,
+            alpha: 0xFF,
             Bitmap : {ptr:0},
-            Color: (obj.colour) ? obj.colour : Color(),
-            Filled: obj.filled,
+            color: obj.colour,
+            filled: obj.filled,
             Font : Font.getStock()
         }
     }
@@ -1186,8 +1161,14 @@ class Shape {
             if (value.Length == 2) {
 
                 value[1] := Color(value[1])
-                value[2] := Color(value[2])           
-                
+                value[2] := Color(value[2])
+
+                ; It's gradient
+                if (tooltype == 4) {
+                    obj.Tool.color := [value[1], value[2]]
+                    return
+                }
+
                 value.InsertAt(1, "")
                     tooltype := 4
             }
@@ -1218,8 +1199,6 @@ class Shape {
                     return
                 ; Gradient
                 case 4:
-                    value[2] := Color(value[2])
-                    value[3] := Color(value[3])
                     LinearGradientMode := (value.Has(4)) ? value[4] : 0
                     WrapMode := (value.Has(5)) ? value[5] : 1
                     RectF := Buffer(16)
@@ -1541,6 +1520,435 @@ class Point extends Shape {
 }
 
 /**
+ * A class for color manipulation and generation.
+ * @property ColorNames a list of color names
+ * credits for sharing: iseahound
+ * 
+ * @Example
+ * c := Color() ; random color
+ * c := Color("Lime") ; color name by calling the color class
+ * c := Color.Lime ; direct access to value by name
+ * c := Color("Red|Blue|Green") ; random color from the list
+ * c := Color("0xFF0000FF") ; 0xARGB
+ * c := Color("#FF0000FF") ; #ARGB
+ * c := Color("0x0000FF") ; 0xRRGGBB
+ * c := Color("#0000FF") ; #RRGGBB
+ * c := Color(0xFF000000) ; hex
+ */
+class Color {
+
+    /**
+     * Returns a random color, accepts multiple type of color inputs.
+     * @param {str} c a color name, ARGB, or a list of color names separated by "|"
+     * @returns {int} ARGB
+     * credits for the idea: iseahound https://github.com/iseahound/Graphics
+     * 
+     * TODO: color name should be around the top segment
+     */
+    static Call(c := "") {
+        if (Type(c) == "String") {
+            return (c == "") ? Random(0xFF000000, 0xFFFFFFFF)     ; random ARGB with max alpha
+                : c ~= "^0x[a-fA-F0-9]{8}$" ? c                   ; correct 0xAARRGGBB 
+                : c ~= "^0x[a-fA-F0-9]{6}$" ? "0xFF" SubStr(c, 3) ; missing alpha channel (0xRRGGBB)
+                : c ~= "^#[a-fA-F0-9]{8}$"  ? "0x" SubStr(c, 2)   ; #AARRGGBB
+                : c ~= "^#[a-fA-F0-9]{6}$"  ? "0xFF" SubStr(c, 2) ; #RRGGBB
+                : c ~= "^[a-fA-F0-9]{8}$"   ? "0x" c              ; missing prefix (AARRGGBB)
+                : c ~= "^[a-fA-F0-9]{6}$"   ? "0xFF" c            ; missing 0xFF (RRGGBB)
+                : c ~= "\|"                 ? this.Random(c)      ; random ARGB
+                : c ~= "^[a-zA-Z]{3,}"      ? this.%c% : ""       ; colorName
+        }
+        else if (Type(c) == "Integer" && c <= 0xFFFFFFFF && c >= 0x00000000) {
+            return c
+        }
+        ; An invalid input
+        return this.red
+    }
+
+    /**
+     * Sets the alpha channel of a color.
+     * @param ARGB a valid ARGB
+     * @param {int} A alpha channel value
+     * @returns {int} ARGB
+     */
+    static Alpha(ARGB, A := 255) {
+        A := (A > 255 ? 255 : A < 0 ? 0 : A)
+        return (A << 24) | (ARGB & 0x00FFFFFF)
+    }
+
+    /**
+     * Sets the alpha channel of a color in float format.
+     * @param ARGB a valid ARGB
+     * @param {float} A alpha channel value
+     * @returns {int} ARGB
+     */
+    static AlphaF(ARGB, A := 1.0) {
+        A := (A > 1.0 ? 255 : A < 0.0 ? 0 : Ceil(A * 255))
+        return (A << 24) | (ARGB & 0x00FFFFFF)
+    }
+
+    /**
+     * Swaps the color channels of an ARGB color.
+     * @param colour 
+     * @param {str} mode 
+     * @returns {int} 
+     */
+    static ChannelSwap(colour, mode := "Rand") {
+        
+        static modes := ["RGB", "RBG", "BGR", "BRG", "GRB", "GBR"]
+        
+        local A, R, G, B
+        local c := 0x0
+
+        if (mode ~= "i)^R(and(om)?)?$") {
+            mode := modes[Random(1, modes.Length)]
+        }
+        else if !(mode ~= "i)^(?!.*(.).*\1)[RGB]{3}$") {
+            throw ValueError("Invalid mode")
+        }
+
+        A := (0xff000000 & colour) >> 24
+        R := (0x00ff0000 & colour) >> 16
+        G := (0x0000ff00 & colour) >>  8
+        B :=  0x000000ff & colour
+
+        for i, channel in StrSplit(mode) {
+            switch channel {
+                case "R","r": c := c | R << 8 * (3 - i)
+                case "G","g": c := c | G << 8 * (3 - i)
+                case "B","b": c := c | B << 8 * (3 - i)
+            }
+        }
+        return (A << 24) | c
+    }
+
+    /**
+     * Returns an array of colors that transition from color1 to color2.
+     * @param color1 starting color
+     * @param color2 end color
+     * @param backforth number of transitions * 100, 2 means back and forth (doubles the array size)
+     * @returns {array}
+     */
+    static GetTransition(color1, color2, backforth := false) {
+        
+        local clr, arr
+
+        if (backforth !== 0 && backforth !== 1)
+            throw ValueError("backforth must be bool")
+
+        ; Validate the colors
+        color1 := this.Call(color1)
+        color2 := this.Call(color2)
+
+        ; Prepare the return array
+        arr := []
+        arr.Length := (backforth + 1) * 100
+
+        ; Push the colors to the array based on the color distance
+        loop 100 {
+            clr := this.LinearInterpolation(color1, color2, A_Index)
+            if (backforth) {
+                arr[200 - A_Index + 1] := clr
+            } 
+            arr[A_Index] := clr
+        }
+        return arr
+    }
+
+    /**
+     * Returns a color that transition from color1 to color2 on a given distance.
+     * @param color1 starting color
+     * @param color2 end color
+     * @param dist distance between the colors
+     * @param alpha alpha channel
+     * @returns {array}
+     */
+    static LinearInterpolation(color1, color2, dist, alpha := 255) {
+        
+        local p, c1, c2, R, G, B, R1, G1, B1, R2, G2, B2
+        
+        ; Convert integer and float to percentage
+        if (Type(dist) == "Integer" && dist >= 0 && dist <= 100) {
+            p := dist * .01
+        }
+        else if (Type(dist) == "Float" && dist >= 0 && dist <= 1) {
+            p := dist * 100
+        }
+        else {
+            throw ValueError("Must be an integer or float")
+        }
+
+        ; Get the R, G, B components of colors
+        c1 := color1
+        c2 := color2
+    
+        R1 := (0x00ff0000 & c1) >> 16
+        G1 := (0x0000ff00 & c1) >>  8
+        B1 :=  0x000000ff & c1
+        
+        R2 := (0x00ff0000 & c2) >> 16
+        G2 := (0x0000ff00 & c2) >>  8
+        B2 :=  0x000000ff & c2
+        
+        ; Calculate the new values
+        R := R1 + Ceil(p * (R2 - R1))
+        G := G1 + Ceil(p * (G2 - G1))
+        B := B1 + Ceil(p * (B2 - B1))
+
+        return (alpha << 24) | (R << 16) | (G << 8) | B
+    }
+
+    /**
+     * Returns a random color, accepts multiple color names, and randomness.
+     * @param {str} colorName single or multiple color names separated by "|"
+     * @param {int} randomness adds a random factor to each channel
+     * @returns {int} ARGB
+     */
+    static Random(colorName := "", randomness := false) {
+        
+        local colors, rand
+
+        if (colorName == "")
+            return Random(0xFF000000, 0xFFFFFFFF)
+
+        ; Check if the string contains multiple color names
+        if (colorName ~= "i)^[a-zA-Z|]+$") {           ; <----- TODO simpler regex
+            colors := StrSplit(colorName, "|")
+        } else
+            colors := [colorName]
+
+        ; Select a random color from the list
+        rand := Random(1, colors.Length)
+        if (!this.HasProp(colors[rand])) {
+            OutputDebug("[i] Color " colors[rand] " not found`n")
+            ; or try regex search from here ...
+            return Random(0xFF000000, 0xFFFFFFFF)
+        }
+
+        ; Apply randomness
+        colors := this.%colors[rand]%
+        if (randomness) {
+            return this.Randomize(colors, randomness)
+        }
+        return colors
+    }
+
+    /**
+     * Randomize a color with a given randomness.
+     * @param {int} ARGB a valid ARGB
+     * @param {int} rand the randomness value
+     * @returns {int} 
+     */
+    static Randomize(ARGB, rand := 15) {
+
+        local R := (0x00ff0000 & ARGB) >> 16
+        local G := (0x0000ff00 & ARGB) >>  8
+        local B :=  0x000000ff & ARGB
+
+        R := Min(255, Max(0, R + Random(-rand, rand)))
+        G := Min(255, Max(0, G + Random(-rand, rand)))
+        B := Min(255, Max(0, B + Random(-rand, rand)))
+
+        return 0xFF000000 | (R << 16) | (G << 8) | B
+    }
+
+    /**
+     * Returns a random ARGB, also accessible as a function (RandomARGB).
+     * @returns {int} 
+     */
+    static RandomARGB() {
+        return Random(0xFF000000, 0xFFFFFFFF)
+    }
+
+    /**
+     * Returns a random color with a given alpha channel from a range.
+     * @param {int} alpha the alpha channel value or the range minimum
+     * @param {int} max the maximum range value
+     * @returns {int} 
+     */
+    static RandomARGBAlphaMax(alpha := 0xFF, max := false) {
+        if (alpha > 255 || alpha < 0 || max > 255 || max < 0)
+            throw ValueError("Alpha must be between 0 and 255")
+        
+        alpha := (max) ? Random(alpha, max) : alpha
+        return (alpha << 24) | Random(0x0, 0xFFFFFF)
+    }
+
+    /**
+     * Returns a color that transition from color1 to color2 on a given distance.
+     * Alias for LinearInterpolation.
+     * @param color1 starting color
+     * @param color2 end color
+     * @param dist distance between the colors
+     * @param alpha alpha channel
+     * @returns {int} ARGB
+     */
+    static Transition(color1, color2, dist := 1, alpha := 255) {
+        if (Type(dist) == "Float")
+            dist := dist * 100
+        return this.LinearInterpolation(Color(color1), Color(color2), dist, alpha)
+    }
+
+    ;{ Color names
+    ; User defined colors
+
+    ; Github
+    static GitHubBlue           := "0xFF0969DA", ; Links and branding elements
+           GitHubGray900        := "0xFF0D1117", ; Dark mode background
+           GitHubGray800        := "0xFF161B22"  ; Secondary background
+
+    ; Credits for sharing: iseahound https://github.com/iseahound
+    ;
+    ; José Roca Software, GDI+ Flat API Reference
+    ; Enumerations: http://www.jose.it-berater.org/gdiplus/iframe/index.htm
+    ;
+    ; Get a colorname: ARGB := Color.BlueViolet
+    static Aliceblue            := "0xFFF0f8FF",
+           AntiqueWhite         := "0xFFFAEBD7",
+           Aqua                 := "0xFF00FFFF",
+           Aquamarine           := "0xFF7FFFD4",
+           Azure                := "0xFFF0FFFF",
+           Beige                := "0xFFF5F5DC",
+           Bisque               := "0xFFFFE4C4",
+           Black                := "0xFF000000",
+           BlanchedAlmond       := "0xFFFFEBCD",
+           Blue                 := "0xFF0000FF",
+           BlueViolet           := "0xFF8A2BE2",
+           Brown                := "0xFFA52A2A",
+           BurlyWood            := "0xFFDEB887",
+           CadetBlue            := "0xFF5F9EA0",
+           Chartreuse           := "0xFF7FFF00",
+           Chocolate            := "0xFFD2691E",
+           Coral                := "0xFFFF7F50",
+           CornflowerBlue       := "0xFF6495ED",
+           Cornsilk             := "0xFFFFF8DC",
+           Crimson              := "0xFFDC143C",
+           Cyan                 := "0xFF00FFFF",
+           DarkBlue             := "0xFF00008B",
+           DarkCyan             := "0xFF008B8B",
+           DarkGoldenrod        := "0xFFB8860B",
+           DarkGray             := "0xFFA9A9A9",
+           DarkGreen            := "0xFF006400",
+           DarkKhaki            := "0xFFBDB76B",
+           DarkMagenta          := "0xFF8B008B",
+           DarkOliveGreen       := "0xFF556B2F",
+           DarkOrange           := "0xFFFF8C00",
+           DarkOrchid           := "0xFF9932CC",
+           DarkRed              := "0xFF8B0000",
+           DarkSalmon           := "0xFFE9967A",
+           DarkSeaGreen         := "0xFF8FBC8B",
+           DarkSlateBlue        := "0xFF483D8B",
+           DarkSlateGray        := "0xFF2F4F4F",
+           DarkTurquoise        := "0xFF00CED1",
+           DarkViolet           := "0xFF9400D3",
+           DeepPink             := "0xFFFF1493",
+           DeepSkyBlue          := "0xFF00BFFF",
+           DimGray              := "0xFF696969",
+           DodgerBlue           := "0xFF1E90FF",
+           Firebrick            := "0xFFB22222",
+           FloralWhite          := "0xFFFFFAF0",
+           ForestGreen          := "0xFF228B22",
+           Fuchsia              := "0xFFFF00FF",
+           Gainsboro            := "0xFFDCDCDC",
+           GhostWhite           := "0xFFF8F8FF",
+           Gold                 := "0xFFFFD700",
+           Goldenrod            := "0xFFDAA520",
+           Gray                 := "0xFF808080",
+           Green                := "0xFF008000",
+           GreenYellow          := "0xFFADFF2F",
+           Honeydew             := "0xFFF0FFF0",
+           HotPink              := "0xFFFF69B4",
+           IndianRed            := "0xFFCD5C5C",
+           Indigo               := "0xFF4B0082",
+           Ivory                := "0xFFFFFFF0",
+           Khaki                := "0xFFF0E68C",
+           Lavender             := "0xFFE6E6FA",
+           LavenderBlush        := "0xFFFFF0F5",
+           LawnGreen            := "0xFF7CFC00",
+           LemonChiffon         := "0xFFFFFACD",
+           LightBlue            := "0xFFADD8E6",
+           LightCoral           := "0xFFF08080",
+           LightCyan            := "0xFFE0FFFF",
+           LightGoldenrodYellow := "0xFFFAFAD2",
+           LightGray            := "0xFFD3D3D3",
+           LightGreen           := "0xFF90EE90",
+           LightPink            := "0xFFFFB6C1",
+           LightSalmon          := "0xFFFFA07A",
+           LightSeaGreen        := "0xFF20B2AA",
+           LightSkyBlue         := "0xFF87CEFA",
+           LightSlateGray       := "0xFF778899",
+           LightSteelBlue       := "0xFFB0C4DE",
+           LightYellow          := "0xFFFFFFE0",
+           Lime                 := "0xFF00FF00",
+           LimeGreen            := "0xFF32CD32",
+           Linen                := "0xFFFAF0E6",
+           Magenta              := "0xFFFF00FF",
+           Maroon               := "0xFF800000",
+           MediumAquamarine     := "0xFF66CDAA",
+           MediumBlue           := "0xFF0000CD",
+           MediumOrchid         := "0xFFBA55D3",
+           MediumPurple         := "0xFF9370DB",
+           MediumSeaGreen       := "0xFF3CB371",
+           MediumSlateBlue      := "0xFF7B68EE",
+           MediumSpringGreen    := "0xFF00FA9A",
+           MediumTurquoise      := "0xFF48D1CC",
+           MediumVioletRed      := "0xFFC71585",
+           MidnightBlue         := "0xFF191970",
+           MintCream            := "0xFFF5FFFA",
+           MistyRose            := "0xFFFFE4E1",
+           Moccasin             := "0xFFFFE4B5",
+           NavajoWhite          := "0xFFFFDEAD",
+           Navy                 := "0xFF000080",
+           OldLace              := "0xFFFDF5E6",
+           Olive                := "0xFF808000",
+           OliveDrab            := "0xFF6B8E23",
+           Orange               := "0xFFFFA500",
+           OrangeRed            := "0xFFFF4500",
+           Orchid               := "0xFFDA70D6",
+           PaleGoldenrod        := "0xFFEEE8AA",
+           PaleGreen            := "0xFF98FB98",
+           PaleTurquoise        := "0xFFAFEEEE",
+           PaleVioletRed        := "0xFFDB7093",
+           PapayaWhip           := "0xFFFFEFD5",
+           PeachPuff            := "0xFFFFDAB9",
+           Peru                 := "0xFFCD853F",
+           Pink                 := "0xFFFFC0CB",
+           Plum                 := "0xFFDDA0DD",
+           PowderBlue           := "0xFFB0E0E6",
+           Purple               := "0xFF800080",
+           Red                  := "0xFFFF0000",
+           RosyBrown            := "0xFFBC8F8F",
+           RoyalBlue            := "0xFF4169E1",
+           SaddleBrown          := "0xFF8B4513",
+           Salmon               := "0xFFFA8072",
+           SandyBrown           := "0xFFF4A460",
+           SeaGreen             := "0xFF2E8B57",
+           SeaShell             := "0xFFFFF5EE",
+           Sienna               := "0xFFA0522D",
+           Silver               := "0xFFC0C0C0",
+           SkyBlue              := "0xFF87CEEB",
+           SlateBlue            := "0xFF6A5ACD",
+           SlateGray            := "0xFF708090",
+           Snow                 := "0xFFFFFAFA",
+           SpringGreen          := "0xFF00FF7F",
+           SteelBlue            := "0xFF4682B4",
+           Tan                  := "0xFFD2B48C",
+           Teal                 := "0xFF008080",
+           Thistle              := "0xFFD8BFD8",
+           Tomato               := "0xFFFF6347",
+           Transparent          := "0x00FFFFFF",
+           Turquoise            := "0xFF40E0D0",
+           Violet               := "0xFFEE82EE",
+           Wheat                := "0xFFF5DEB3",
+           White                := "0xFFFFFFFF",
+           WhiteSmoke           := "0xFFF5F5F5",
+           Yellow               := "0xFFFFFF00",
+           YellowGreen          := "0xFF9ACD32"
+    ;}
+    ; Region specific colors
+    
+}
+
+/**
  * This function is responsible for rendering and refreshing the specified
  * layer, window on the display. Each layer has its own graphics object,
  * and the function draws the shapes, images, and texts on the layer.
@@ -1564,13 +1972,15 @@ Draw(lyr) {
 
     ; Clear the entire buffer if the layer is not persistent
     if (!lyr.redraw) {
-        DllCall("RtlZeroMemory", "ptr", Graphics.%lyr.id%.ppvBits, "ptr", lyr.w * lyr.h * 4)
         
-        ; Reset the world transform and perform a new translation if the layer has changed position 
+        ; Erasing only a region looked like a good idea, but it's slower (see EraseRegion function)
+        DllCall("RtlZeroMemory", "ptr", Graphics.%lyr.id%.ppvBits, "ptr", lyr.w * lyr.h * 4)
+
+        ; Reset the world transform and perform a new translation if the layer has changed position
         if (x1 !== lyr.x1 || y1 !== lyr.y1) {
             DllCall("gdiplus\GdipResetWorldTransform", "ptr", gfx)
             DllCall("gdiplus\GdipTranslateWorldTransform", "ptr", gfx, "float", -lyr.x1, "float", -lyr.y1, "int", 0)
-        } 
+        }
     }
     else {
         ; Cropped
@@ -1578,22 +1988,21 @@ Draw(lyr) {
         lyr.y1 := y1
         lyr.width := w1
         lyr.height := h1
-        ;{ For full DIB size:
+        ; For full DIB size:
         ;lyr.x1 := 0
         ;lyr.y1 := 0
         ;lyr.width := Graphics.%lyr.id%.w
         ;lyr.height := Graphics.%lyr.id%.h
-        ;}
     }
 
     ; Parse the visible shape list and draw
     loop parse, lyr.prepared, "|" {
 
         v := Shapes.%lyr.id%.%A_LoopField%
-        
-        ;{ Crop if outside of the layer boundaries, assume it is inside
+
+        ; Crop if outside of the layer boundaries, assume it is inside
         if !(v.Shape ~= "(Triangle|Polygon|Bezier|Line)$") {
-            
+
             ; Horizontal
             if (v.x >= 0 && v.x + v.w <= lyr.w) {
                 x := v.x
@@ -1607,7 +2016,7 @@ Draw(lyr) {
                 x := v.x
                 w := lyr.w - v.x
             }
-            
+
             ; Vertical
             if (v.y >= 0 && v.y + v.h <= lyr.h) {
                 y := v.y
@@ -1628,7 +2037,6 @@ Draw(lyr) {
                 h -= 1
             }
         }
-        ;}
 
         ; Reference to the shape's tool (Brush, Pen)
         ptr := Shapes.%lyr.id%.%v.id%.Tool.ptr
@@ -1638,10 +2046,10 @@ Draw(lyr) {
             ; TODO: reimplement graphics settings, currently commented out
 
             case "Arc":
-                ;DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0) 
+                ;DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0)
                 DllCall("gdiplus\GdipDrawArc"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
@@ -1651,8 +2059,8 @@ Draw(lyr) {
 
             case "Bezier":
                 DllCall("gdiplus\GdipDrawBezier"
-                    ,  "ptr", gfx
-                    ,  "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", v.x1
                     , "float", v.y1
                     , "float", v.x2
@@ -1668,38 +2076,38 @@ Draw(lyr) {
                     , "ptr", ptr
                     , "ptr", v.pPoints
                     , "int", v.points)
-            
+
             case "Ellipse":
                 DllCall("gdiplus\GdipDrawEllipse"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
                     , "float", h)
-            
+
             case "FilledRectangle", "FilledSquare":
                 DllCall("gdiplus\GdipFillRectangle"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
                     , "float", h)
-            
+
             case "Rectangle", "Square":
                 DllCall("gdiplus\GdipDrawRectangle"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
                     , "float", h)
-            
+
             case "FilledEllipse":
                 DllCall("gdiplus\GdipFillEllipse"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
@@ -1707,19 +2115,19 @@ Draw(lyr) {
 
             case "FilledPie":
                 DllCall("gdiplus\GdipFillPie"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
                     , "float", h
                     , "float", v.startangle
                     , "float", v.sweepangle)
-            
+
             case "Pie":
                 DllCall("gdiplus\GdipDrawPie"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", x
                     , "float", y
                     , "float", w
@@ -1729,28 +2137,28 @@ Draw(lyr) {
 
             case "FilledTriangle", "FilledPolygon":
                 DllCall("gdiplus\GdipFillPolygon"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
-                    ,   "ptr", v.pPoints
-                    ,   "int", v.points
-                    ,   "int", v.fillMode)
-            
+                    , "ptr", gfx
+                    , "ptr", ptr
+                    , "ptr", v.pPoints
+                    , "int", v.points
+                    , "int", v.fillMode)
+
             case "Triangle", "Polygon":
                 DllCall("gdiplus\GdipDrawPolygon"
-                    ,   "ptr", gfx
-                    ,   "ptr", ptr
-                    ,   "ptr", v.pPoints
-                    ,   "int", v.points)
+                    , "ptr", gfx
+                    , "ptr", ptr
+                    , "ptr", v.pPoints
+                    , "int", v.points)
 
-             case "Line":
+            case "Line":
                 DllCall("gdiplus\GdipDrawLine"
-                    ,  "ptr", gfx
-                    ,  "ptr", ptr
+                    , "ptr", gfx
+                    , "ptr", ptr
                     , "float", v.x1
                     , "float", v.y1
                     , "float", v.x2
                     , "float", v.y2)
-            
+
             case "Lines":
                 DllCall("gdiplus\GdipDrawLines"
                     , "ptr", gfx
@@ -1763,20 +2171,20 @@ Draw(lyr) {
         if (v.Bitmap.ptr) {
 
             ; Save the current graphics settings and set the new settings for the bitmap drawing
-            DllCall("gdiplus\GdipSaveGraphics",          "ptr", gfx, "ptr*", &pState := 0)
-            DllCall("gdiplus\GdipSetPixelOffsetMode",    "ptr", gfx, "int", 2) ; Half pixel offset
-            DllCall("gdiplus\GdipSetCompositingMode",    "ptr", gfx, "int", 0) ; Overwrite/SourceCopy
+            DllCall("gdiplus\GdipSaveGraphics", "ptr", gfx, "ptr*", &pState := 0)
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "ptr", gfx, "int", 2) ; Half pixel offset
+            DllCall("gdiplus\GdipSetCompositingMode", "ptr", gfx, "int", 0) ; Overwrite/SourceCopy
             DllCall("gdiplus\GdipSetCompositingQuality", "ptr", gfx, "int", 0) ; AssumeLinear
-            DllCall("gdiplus\GdipSetSmoothingMode",      "ptr", gfx, "int", 0) ; No anti-alias
-            DllCall("gdiplus\GdipSetInterpolationMode",  "ptr", gfx, "int", 7) ; HighQualityBicubic
+            DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0) ; No anti-alias
+            DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7) ; HighQualityBicubic
 
             ; Align the image to center inside the object
             x2 := v.x + (v.w - v.Bitmap.w) // 2
             y2 := v.y + (v.h - v.Bitmap.h) // 2
-                
+
             ; GdipDrawImage is faster than GdipDrawImageRectRect, but it doesn't support scaling
             if (v.bmpW || v.bmpH || v.bmpSrcW || v.bmpSrcH || v.bmpSrcX || v.bmpSrcY) {
-                
+
                 ; Calculate the destination
                 x2 += v.bmpX
                 y2 += v.bmpY
@@ -1790,23 +2198,23 @@ Draw(lyr) {
                 h1 := v.bmpSrcH ? v.Bitmap.h + v.bmpSrcH - y1 : v.Bitmap.h - y1
 
                 DllCall("gdiplus\GdipDrawImageRectRectI"
-                       ,   "ptr", gfx
-                       ,   "ptr", v.Bitmap.ptr
-                       ,   "int", x2, "int", y2, "int", w2, "int", h2 ; dest 
-                       ,   "int", x1, "int", y1, "int", w1, "int", h1 ; src
-                       ,   "int", 2
-                       ,   "ptr", 0
-                       ,   "ptr", 0
-                       ,   "ptr", 0)
+                    , "ptr", gfx
+                    , "ptr", v.Bitmap.ptr
+                    , "int", x2, "int", y2, "int", w2, "int", h2 ; dest
+                    , "int", x1, "int", y1, "int", w1, "int", h1 ; src
+                    , "int", 2
+                    , "ptr", 0
+                    , "ptr", 0
+                    , "ptr", 0)
             }
             else {
                 DllCall("gdiplus\GdipDrawImage"
-                       , "ptr", gfx
-                       , "ptr", v.Bitmap.ptr
-                       , "float", x2 + v.bmpX
-                       , "float", y2 + v.bmpY)
+                    , "ptr", gfx
+                    , "ptr", v.Bitmap.ptr
+                    , "float", x2 + v.bmpX
+                    , "float", y2 + v.bmpY)
             }
-            
+
             ; Restore the saved graphics settings.
             DllCall("gdiplus\GdipRestoreGraphics", "ptr", gfx, "ptr", pState)
         }
@@ -1824,11 +2232,11 @@ Draw(lyr) {
             ; Each font has its own alignment settings
             if (v.strH !== v.Font.alignmentH) {
                 DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", v.Font.alignmentH)
-                 v.Font.alignmentH := v.strH
+                v.Font.alignmentH := v.strH
             }
             if (v.strV !== v.Font.alignmentV) {
-                 DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", v.Font.alignmentV)
-                 v.Font.alignmentV := v.strV
+                DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", v.Font.alignmentV)
+                v.Font.alignmentV := v.strV
             }
 
             ; Save the current graphics settings
@@ -1836,7 +2244,7 @@ Draw(lyr) {
             DllCall("gdiplus\GdipSaveGraphics", "ptr", gfx, "ptr*", &pState := 0)
 
             ; Set the text vertical and horizontal string format alignment. ; -> TODO check if switch required
-            DllCall("gdiplus\GdipSetStringFormatAlign"    , "ptr", v.Font.hFormat, "int", v.font.AlignmentH)
+            DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", v.font.AlignmentH)
             DllCall("Gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", v.font.AlignmentV)
 
             ; Create a RectF structure to hold the bounding rectangle of the string
@@ -1848,14 +2256,14 @@ Draw(lyr) {
 
             ; Draw the string without any measurement.
             DllCall("gdiplus\GdipDrawString"
-                ,  "ptr", gfx            ; pointer to the graphics object
+                , "ptr", gfx            ; pointer to the graphics object
                 , "wstr", v.str         ; pointer to the string
-                ,  "int", -1             ; null terminated
-                ,  "ptr", v.Font.hFont   ; pointer to the font object
-                ,  "ptr", RectF          ; pointer to the bounding rectangle
-                ,  "ptr", v.Font.hFormat ; pointer to the string format object
-                ,  "ptr", v.Font.pBrush) ; pointer to the brush object
-                    
+                , "int", -1             ; null terminated
+                , "ptr", v.Font.hFont   ; pointer to the font object
+                , "ptr", RectF          ; pointer to the bounding rectangle
+                , "ptr", v.Font.hFormat ; pointer to the string format object
+                , "ptr", v.Font.pBrush) ; pointer to the brush object
+
             ; Restore the original graphics settings, and Font color. (Brush)
             DllCall("gdiplus\GdipRestoreGraphics", "ptr", gfx, "ptr", pState)
         }
@@ -1867,15 +2275,15 @@ Draw(lyr) {
 
     ; Update the window
     DllCall("UpdateLayeredWindow"
-        , "ptr"    , lyr.hwnd
-        , "ptr"    , 0
+        , "ptr", lyr.hwnd
+        , "ptr", 0
         , "uint64*", (lyr.x + lyr.x1) | (lyr.y + lyr.y1) << 32
         , "uint64*", lyr.width | lyr.height << 32 ; TODO: calculate the update region
-        , "ptr"    , Graphics.%lyr.id%.hdc
-        , "uint64*", 0 
-        , "uint"   , 0
-        , "uint*"  , lyr.alpha << 16 | 1 << 24
-        , "uint"   , 2)
+        , "ptr", Graphics.%lyr.id%.hdc
+        , "uint64*", 0
+        , "uint", 0
+        , "uint*", lyr.alpha << 16 | 1 << 24
+        , "uint", 2)
     return
 }
 
@@ -1893,19 +2301,19 @@ class Render {
     static Layer(obj) {
 
         ; Start timer, draw layer
-        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf)
+        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
         Draw(obj)
 
         ; Calculate elapsed time in milliseconds since the last frame update
-        elapsed := ((DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf) - start) * 1000
-                + (Fps.frames ? (start - Fps.lasttick) * 1000 : 0)
-        
+        elapsed := ((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
+            + (Fps.frames ? (start - Fps.lasttick) * 1000 : 0)
+
         ; Wait until the specified frame time is reached to sync drawing
         waited := 0
         if (Fps.frametime && Fps.frametime > elapsed) {
-            start := (DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf)
+            start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
             while (Fps.frametime >= elapsed + waited) {
-                waited := ((DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf) - start) * 1000
+                waited := ((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
             }
         }
 
@@ -1918,25 +2326,25 @@ class Render {
         Fps.frames += 1
 
         ; Update the last tick, this helps to calculate the elapsed time between two render calls
-        Fps.lasttick := (DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf)
+        Fps.lasttick := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
     }
 
     ; For multiple layers rendering
     static Layers(obj*) {
 
         ; Start with the timer
-        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf)
+        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
 
         ; If Fps is set to persistent, push its layer to the array, so it's displayed during the render
         if (Fps.persistent && Fps.Layer) {
             obj.Push(Fps.Layer)
         }
-        
-        Loop obj.Length {
-            
+
+        loop obj.Length {
+
             ; If the object is hidden or set to update every n frames, skip drawing
             if (!obj[A_Index].visible
-            ||  (obj[A_Index].updatefreq && Mod(Fps.frames, obj[A_Index].updatefreq))) {
+            || (obj[A_Index].updatefreq && Mod(Fps.frames, obj[A_Index].updatefreq))) {
                 continue
             }
 
@@ -1948,14 +2356,14 @@ class Render {
             Draw(obj[A_Index])
         }
 
-        elapsed := (((DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf) - start) * 1000)
-                + (Fps.frames ? (start - Fps.lasttick) * 1000 : 0)
-        
+        elapsed := (((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000)
+            + (Fps.frames ? (start - Fps.lasttick) * 1000 : 0)
+
         waited := 0
         if (Fps.frametime && Fps.frametime > elapsed) {
-            start := (DllCall("QueryPerformanceCounter", "Int64*", &qpc:=0), qpc / this.qpf)
+            start := (DllCall("QueryPerformanceCounter", "Int64*", &qpc := 0), qpc / this.qpf)
             while (Fps.frametime >= elapsed + waited)
-                waited := ((DllCall("QueryPerformanceCounter", "Int64*", &qpc:=0), qpc / this.qpf) - start) * 1000
+                waited := ((DllCall("QueryPerformanceCounter", "Int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
         }
 
         Fps.rendertime += elapsed + waited
@@ -1964,13 +2372,13 @@ class Render {
         Fps.totalrender += elapsed
         Fps.lastrender := 1000 / elapsed
         Fps.frames += 1
-        Fps.lasttick := (DllCall("QueryPerformanceCounter", "int64*", &qpc:=0), qpc / this.qpf)
+        Fps.lasttick := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
         return
     }
 
     ; Binds the QueryPerformanceFrequency function as a property
     static __New() {
-        this.DefineProp("qpf", {get : (*) => (DllCall("QueryPerformanceFrequency", "int64*", &qpf:=0), qpf)})
+        this.DefineProp("qpf", { get: (*) => (DllCall("QueryPerformanceFrequency", "int64*", &qpf := 0), qpf) })
     }
 }
 
@@ -2016,7 +2424,7 @@ class Fps {
      * Using the Render class instead of the Draw function enables the fps
      * panel to be displayed on the screen. Calling Display will create a
      * temporary layer for this purpose.
-     * @param {int} delay 
+     * @param {int|float} delay 
      */
     static Display(delay := 1000) {
         
@@ -2213,7 +2621,7 @@ class Fps {
 class Bitmap {
 
     /**
-     * Creates a bitmap object with the specified width and height.
+     * Creates a bitmap with the specified width and height.
      * @param width the width of the bitmap
      * @param height the height of the bitmap 
      */
@@ -2222,7 +2630,7 @@ class Bitmap {
                     ,  "int", width        ; width of the bitmap
                     ,  "int", height       ; height
                     ,  "int", 0            ; stride (width) in bytes
-                    ,  "int", 0xE200B      ; PixelFormat32bppPARGB) pre multiplied alpha
+                    ,  "int", 0xE200B      ; PixelFormat32bppPARGB pre multiplied alpha
                     ,  "ptr", 0            ; scan0 pointer to the pixel data
                     , "ptr*", &pBitmap:=0) ; pointer to a pBitmap object
         this.ptr := pBitmap
@@ -2253,7 +2661,7 @@ class Bitmap {
     /**
      * Loads a bitmap from a file and stores it in the class's instance variables.
      * It can also perform resizing and color matrix operations on the bitmap if requested.
-     * @param {str} filepath path to the image file.
+     * @param {str} filepath path to the image file
      * @param {int|str} option percentage or width and height of the new bitmap
      * @param {str} cmatrix color matrix to apply to the image
      */
@@ -2271,7 +2679,7 @@ class Bitmap {
 
     /**
      * Resizes a bitmap, by specifying new width and height or by a percentage. Optionally applies color attributes.
-     * @param {int|str} option percentage or width and height of the new bitmap.
+     * @param {int|str} option percentage or width and height of the new bitmap
      * @param {str} cmatrix color matrix to apply to the image
      */
     Resize(option, cmatrix := 0) {
@@ -2326,7 +2734,7 @@ class Bitmap {
                     , "int", 0)         ; ColorMatrixFlags flags
         }
 
-        ; Draw the original bitmap on the new bitmap using GdipDrawImageRectRectI.
+        ; Draw the original bitmap on the new bitmap using GdipDrawImageRectRectI
         DllCall("gdiplus\GdipDrawImageRectRectI"
                     , "ptr", gfx        ; pointer to the temp graphics
                     , "ptr", this.ptr   ; pointer to the orig bitmap
@@ -2337,7 +2745,7 @@ class Bitmap {
                     , "int", 0          ; src x coordinate of the upper-left corner of src rect
                     , "int", 0          ; src y
                     , "int", this.w     ; src width
-                    , "int", this.h	    ; src height
+                    , "int", this.h     ; src height
                     , "int", 2          ; src Unit
                     , "ptr", ImageAttr  ; pointer to an image attributes object
                     , "ptr", 0          ; DrawImageAbort callback
@@ -2401,6 +2809,89 @@ class Bitmap {
     __Delete() {
         DllCall("gdiplus\GdipDisposeImage", "ptr", this.ptr)
         OutputDebug("[-] Bitmap deleted " this.ptr "`n")
+    }
+}
+
+/**
+ * A Class the holds buffers for various color matrixes.
+ * Required for applying color effects to images.
+ */
+class ColorMatrix {
+
+    static __New() {
+
+        local colorMatrixes := {
+
+            bright : [
+                  1.5,     0,     0,     0,     0,
+                    0,   1.5,     0,     0,     0,
+                    0,     0,   1.5,     0,     0,
+                    0,     0,     0,     1,     0,
+                 0.05,  0.05,  0.05,     0,     1] ,
+            
+            grayscale : [
+                0.299, 0.299, 0.299,     0,     0,
+                0.587, 0.587, 0.587,     0,     0,
+                0.114, 0.114, 0.114,     0,     0,
+                    0,     0,     0,     1,     0,
+                    0,     0,     0,     0,     1] ,
+
+            negative : [
+                   -1,     0,     0,     0,     0,
+                    0,    -1,     0,     0,     0,
+                    0,     0,    -1,     0,     0,
+                    0,     0,     0,     1,     0,
+                    1,     1,     1,     0,     1] ,
+
+            sepia : [
+                0.393, 0.349, 0.272,     0,     0,
+                0.769, 0.686, 0.534,     0,     0,
+                0.189, 0.168, 0.131,     0,     0,
+                    0,     0,     0,     1,     0,
+                    0,     0,     0,     0,     1] ,
+
+            invert : [
+                   -1,     0,     0,     0,     0,
+                    0,    -1,     0,     0,     0,
+                    0,     0,    -1,     0,     0,
+                    0,     0,     0,     1,     0,
+                    1,     1,     1,     0,     1] ,
+
+            redonly : [
+                    1,     0,     0,     0,     0,
+                    0,     0,     0,     0,     0,
+                    0,     0,     0,     0,     0,
+                    0,     0,     0,     1,     0,
+                    0,     0,     0,     0,     1] ,
+            
+            greenonly : [ 
+                    0,     0,     0,     0,     0,
+                    0,     1,     0,     0,     0,
+                    0,     0,     0,     0,     0,
+                    0,     0,     0,     1,     0,
+                    0,     0,     0,     0,     1] ,
+            
+            blueonly : [
+                    0,     0,     0,     0,     0,
+                    0,     0,     0,     0,     0,
+                    0,     0,     1,     0,     0,
+                    0,     0,     0,     1,     0,
+                    0,     0,     0,     0,     1]
+        }
+
+        ; Allocate a total of 900 bytes to preload the color matrixes
+        local key, arr, buf
+
+        for key, arr in colorMatrixes.OwnProps() {
+            buf := Buffer(4 * arr.Length)
+            loop 25 {
+                NumPut("float", arr[A_Index], buf, (A_Index - 1) * 4)
+            }
+            this.%key% := buf
+        }
+
+        OutputDebug("[i] Color matrixes loaded successfully`n")
+        return
     }
 }
 
@@ -2486,7 +2977,7 @@ class Font {
      * @param {str} family font family name
      * @param {int} size font size
      * @param {str} style font style
-     * @param {clr} colour accepts a color name or (A)RGB
+     * @param {int|str} colour accepts a color name or (A)RGB
      * @param {int} quality rendering quality
      * @param {int} alignmentH horizontal alignment
      * @param {int} alignmentV vertical alignment
@@ -2660,7 +3151,7 @@ class Graphics {
         this.id := (id) ? id : Layer.activeid
         
         ; Create a device independent bitmap and a graphics
-        hdc := DllCall("GetDC", "ptr", 0) ; handle device content
+        hdc := DllCall("GetDC", "ptr", 0) ; handle to the device context
         bi := Buffer(40, 0)               ; Bitmap info struct
         NumPut("uint", 40, "uint", width, "uint", height, "ushort", 1, "ushort", 32, bi)
         hbm := DllCall("CreateDIBSection", "ptr", hdc, "ptr", bi, "int", 0, "ptr*", &ppvBits:=0, "ptr", 0, "int", 0, "ptr")
@@ -2670,6 +3161,7 @@ class Graphics {
         obm := DllCall("SelectObject", "ptr", hdc, "ptr", hbm)
         DllCall("gdiplus\GdipCreateFromHDC", "ptr", hdc, "ptr*", &pGraphics:=0)
         
+        ; Store for drawing
         this.hdc := hdc
         this.hbm := hbm
         this.obm := obm
@@ -2688,10 +3180,10 @@ class Graphics {
     __Delete() {
         if (!this.gfx)
             return
-        DllCall('gdiplus\GdipDeleteGraphics', 'ptr', this.gfx)
-        DllCall('SelectObject', 'ptr', this.hdc , 'ptr', this.obm)
-        DllCall('DeleteObject', 'ptr', this.hbm)
-        DllCall('DeleteDC'    , 'ptr', this.hdc)
+        DllCall("gdiplus\GdipDeleteGraphics", "ptr", this.gfx)
+        DllCall("SelectObject", "ptr", this.hdc , "ptr", this.obm)
+        DllCall("DeleteObject", "ptr", this.hbm)
+        DllCall("DeleteDC"    , "ptr", this.hdc)
         this.gfx := 0
         OutputDebug("[-] Graphics " this.id " deleted`n")
         return
@@ -2874,7 +3366,7 @@ class TextureBrush extends Brush {
 
     /**
      * Creates a new TextureBrush object with the specified bitmap.
-     * @param {Bitmap} pBitmap Accepts a Bitmap object or a valid bitmap pointer or a path to an existing image file
+     * @param {int} pBitmap Accepts a Bitmap object or a valid bitmap pointer or a path to an existing image file
      * @param {int} WrapmodeTile Wraps the texture image
      * @param {int} Resize A brush from a file can be resized by a percentage
      * @param {int} x Coordinate from top left corner
@@ -2955,19 +3447,19 @@ class LinearGradientBrush extends Brush {
      * Creates a new LinearGradientBrush object with the specified colors and mode.
      * @param foreARGB 
      * @param backARGB 
-     * @param {int} LinearGradientMode 
-     * @param {int} WrapMode 
+     * @param {int} gradMode 
+     * @param {int} wrapMode 
      * @param {int} pRectF 
      */
-    __New(foreARGB, backARGB, LinearGradientMode := 1, wrapMode := 1, pRectF := 0) {
-        this.LinearGradientMode(&linearGradientMode)
+    __New(foreARGB, backARGB, gradMode := 1, wrapMode := 1, pRectF := 0) {
+        this.LinearGradientMode(&gradMode)
         DllCall("gdiplus\GdipCreateLineBrushFromRect"
-            ,  "ptr", pRectF             ; pointer to rect structure 
-            ,  "int", foreARGB           ; foreground ARGB
-            ,  "int", backARGB           ; background ARGB
-            ,  "int", linearGradientMode ; LinearGradientMode
-            ,  "int", wrapMode           ; WrapMode
-            , "ptr*", &LGpBrush:=0)      ; pointer to the LinearGradientBrush
+            ,  "ptr", pRectF        ; pointer to rect structure 
+            ,  "int", foreARGB      ; foreground ARGB
+            ,  "int", backARGB      ; background ARGB
+            ,  "int", gradMode      ; LinearGradientMode
+            ,  "int", wrapMode      ; WrapMode
+            , "ptr*", &LGpBrush:=0) ; pointer to the LinearGradientBrush
         this.ptr := LGpBrush
         this.type := 4
         OutputDebug("[+] LinearGradientBrush created " LGpBrush "`n")
@@ -2994,7 +3486,6 @@ class LinearGradientBrush extends Brush {
             return (DllCall("gdiplus\GdipGetLineColors", "ptr", this.ptr, "int*", &c1:=0, "int*", &c2:=0), [c1, c2])
         } 
     } 
-
 }
 
 /**
@@ -3012,7 +3503,7 @@ class PathGradient extends Brush {
  */
 RandomARGB() => Random(0xFF000000, 0xFFFFFFFF)
 
-/** Returns a ARGB with a provided alpha
+/** Returns a ARGB with a provided alpha.
  * @param {int} alpha
  * @returns {int}
  */
@@ -3067,7 +3558,7 @@ Welcome(delay := .5) {
  * @param {float} delay * 1000 ms, timeout
  * @return {void}
  */
-GoodBye(delay := .5) {
+GoodBye(delay := .25) {
 
     local lyr, rect
 
@@ -3084,7 +3575,8 @@ GoodBye(delay := .5) {
     rect.Text(, "white", 24)
 
     Clean()
-    loop parse, systext.goodbye {
+    ;loop parse, systext.goodbye {
+    loop parse, "exiting..." {
         rect.str .= A_LoopField
         if (A_LoopField !== "`n")
             Sleep(10)
@@ -3099,7 +3591,7 @@ GoodBye(delay := .5) {
 }
 
 /**
- * Clean all layers
+ * Clean all layers.
  * @return {void}
  * credit: iseahound
  */
@@ -3130,7 +3622,7 @@ IsBool(int) {
 }
 
 /**
- * Check if the value is a number
+ * Check if the value is a number.
  * @param {int} 
  * @return {bool}
  */
@@ -3139,7 +3631,7 @@ IsAlphaNum(int) {
 }
 
 /**
- * Validate an ARGB value
+ * Validate an ARGB value.
  * @param ARGB 
  */
 IsARGB(ARGB) {
@@ -3152,7 +3644,7 @@ IsARGB(ARGB) {
 }
 
 /**
- * Convert an int to ARGB
+ * Convert an int to ARGB.
  * @param {int} 
  * @return {str}
  * Slightly performs better than Format("{:08X}", int)
@@ -3165,14 +3657,14 @@ itoARGB(int) {
 }
 
 /**
- * Alias for itoARGB, convert an int to ARGB
+ * Alias for itoARGB, convert an int to ARGB.
  * @param {int} 
  * @return {str}
  */
 intToARGB(int) => itoARGB(int)
 
 /**
- * Position enumerations
+ * Position enumerations.
  * @param {int|str} n
  * @return {int} position index
  * TODO: later
@@ -3188,753 +3680,6 @@ PositionByNumber(n) {
         case 7: p := "TopLeft"
         case 8: p := "TopCenter"
         case 9: p := "TopRight"
-    }
-}
-
-/**
- * Deprecated function
- * 
- * ; This function is deprecated due to its inefficiency
- *  itoARGB_deprecated(int) {
- *      if (Type(int) == "Integer" || Type(int) == "String") {
- *          ARGB := int & 0xFFFFFFFF
- *          if (ARGB < 0x00000000 && ARGB > 0xFFFFFFFF)  ; not valid ARGB
- *              return 0
- *          Hex := "0x"
- *          i := 7
- *          while (i >= 0) {
- *              Hex .= SubStr("0123456789ABCDEF", ((ARGB >> (i-- * 4)) & 0xF) + 1, 1)
- *          }
- *          return Hex
- *      }
- *  }
- * 
- *  ; Erase a region of a graphics object
- *  EraseRegion(ppvBits, DIB_Width, x, y, w, h) {
- *      bytesPerPixel := 4
- *      bytesPerRow := DIB_Width * bytesPerPixel  ; Total bytes per row in the full DIB *
- *      ; Pointer to top-left of the erase region
- *      startPtr := ppvBits + (y * bytesPerRow) + (x * bytesPerPixel)
- *      ; Loop through the height of the region
- *      loop h { 
- *          ; Zero out just this row
- *          DllCall("RtlZeroMemory", "ptr", startPtr, "uptr", w * bytesPerPixel)  
- *          ; Move to the next row
- *          startPtr += bytesPerRow  
- *      }
- *   }
- */
-
-/**
- * A class for color manipulation and generation.
- * @property ColorNames a list of color names
- * credits for sharing: iseahound
- * 
- * @Example
- * c := Color() ; random color
- * c := Color("Lime") ; color name by calling the color class
- * c := Color.Lime ; direct access to value by name
- * c := Color("Red|Blue|Green") ; random color from the list
- * c := Color("0xFF0000FF") ; 0xARGB
- * c := Color("#FF0000FF") ; #ARGB
- * c := Color("0x0000FF") ; 0xRRGGBB
- * c := Color("#0000FF") ; #RRGGBB
- * c := Color(0xFF000000) ; hex
- */
-class Color {
-
-    /**
-     * Returns a random color, accepts multiple type of color inputs
-     * @param {str} c a color name, ARGB, or a list of color names separated by "|"
-     * @returns {int} ARGB
-     * credits for the idea: iseahound https://github.com/iseahound/Graphics
-     * 
-     * TODO: color name should be around the top segment
-     */
-    static Call(c := "") {
-        if (Type(c) == "String") {
-            return (c == "") ? Random(0xFF000000, 0xFFFFFFFF)       ; random ARGB with max alpha
-                : c ~= "^0x[a-fA-F0-9]{8}$" ? c                   ; correct 0xAARRGGBB 
-                : c ~= "^0x[a-fA-F0-9]{6}$" ? "0xFF" SubStr(c, 3) ; missing alpha channel (0xRRGGBB)
-                : c ~= "^#[a-fA-F0-9]{8}$"  ? "0x" SubStr(c, 2)   ; #AARRGGBB
-                : c ~= "^#[a-fA-F0-9]{6}$"  ? "0xFF" SubStr(c, 2) ; #RRGGBB
-                : c ~= "^[a-fA-F0-9]{8}$"   ? "0x" c              ; missing prefix (AARRGGBB)
-                : c ~= "^[a-fA-F0-9]{6}$"   ? "0xFF" c            ; missing 0xFF (RRGGBB)
-                : c ~= "\|"                 ? this.Random(c)      ; random ARGB
-                : c ~= "^[a-zA-Z]{3,}"      ? this.%c% : ""       ; colorName
-        }
-        else if (Type(c) == "Integer" && c <= 0xFFFFFFFF && c >= 0x00000000) {
-            return c
-        }
-        throw ValueError("Invalid color input")
-    }
-
-    /**
-     * Sets the alpha channel of a color
-     * @param ARGB a valid ARGB
-     * @param {int} A alpha channel value
-     * @returns {int} ARGB
-     */
-    static Alpha(ARGB, A := 255) {
-        A := (A > 255 ? 255 : A < 0 ? 0 : A)
-        return (A << 24) | (ARGB & 0x00FFFFFF)
-    }
-
-    /**
-     * Sets the alpha channel of a color in float format
-     * @param ARGB a valid ARGB
-     * @param {float} A alpha channel value
-     * @returns {int} ARGB
-     */
-    static AlphaF(ARGB, A := 1.0) {
-        A := (A > 1.0 ? 255 : A < 0.0 ? 0 : Ceil(A * 255))
-        return (A << 24) | (ARGB & 0x00FFFFFF)
-    }
-
-    /**
-     * Swaps the color channels of an ARGB color
-     * @param colour 
-     * @param {str} mode 
-     * @returns {int} 
-     */
-    static ChannelSwap(colour, mode := "Rand") {
-        
-        static modes := ["RGB", "RBG", "BGR", "BRG", "GRB", "GBR"]
-        
-        local A, R, G, B
-        local c := 0x0
-
-        if (mode ~= "i)^R(and(om)?)?$") {
-            mode := modes[Random(1, modes.Length)]
-        }
-        else if !(mode ~= "i)^(?!.*(.).*\1)[RGB]{3}$") {
-            throw ValueError("Invalid mode")
-        }
-
-        A := (0xff000000 & colour) >> 24
-        R := (0x00ff0000 & colour) >> 16
-        G := (0x0000ff00 & colour) >>  8
-        B :=  0x000000ff & colour
-
-        for i, channel in StrSplit(mode) {
-            switch channel {
-                case "R","r": c := c | R << 8 * (3 - i)
-                case "G","g": c := c | G << 8 * (3 - i)
-                case "B","b": c := c | B << 8 * (3 - i)
-            }
-        }
-        return (A << 24) | c
-    }
-
-    /**
-     * Returns an array of colors that transition from color1 to color2
-     * @param color1 starting color
-     * @param color2 end color
-     * @param backforth number of transitions * 100, 2 means back and forth (doubles the array size)
-     * @returns {array}
-     */
-    static GetTransation(color1, color2, backforth := false) {
-        
-        local clr, arr
-
-        if (backforth !== 0 && backforth !== 1)
-            throw ValueError("backforth must be bool")
-
-        ; Validate the colors
-        color1 := this.Call(color1)
-        color2 := this.Call(color2)
-
-        ; Prepare the return array
-        arr := []
-        arr.Length := (backforth + 1) * 100
-
-        ; Push the colors to the array based on the color distance
-        loop 100 {
-            clr := this.LinearInterpolation(color1, color2, A_Index)
-            if (backforth) {
-                arr[200 - A_Index + 1] := clr
-            } 
-            arr[A_Index] := clr
-        }
-        return arr
-    }
-
-    /**
-     * Returns a color that transition from color1 to color2 on a given distance
-     * @param color1 starting color
-     * @param color2 end color
-     * @param dist distance between the colors
-     * @param alpha alpha channel
-     * @returns {array}
-     */
-    static LinearInterpolation(color1, color2, dist, alpha := 255) {
-        
-        local p, c1, c2, R, G, B, R1, G1, B1, R2, G2, B2
-        
-        ; Convert integer and float to percentage
-        if (Type(dist) == "Integer" && dist >= 0 && dist <= 100) {
-            p := dist * .01
-        }
-        else if (Type(dist) == "Float" && dist >= 0 && dist <= 1) {
-            p := dist * 100
-        }
-        else {
-            throw ValueError("Must be an integer or float")
-        }
-
-        ; Get the R, G, B components of colors
-        c1 := color1
-        c2 := color2
-    
-        R1 := (0x00ff0000 & c1) >> 16
-        G1 := (0x0000ff00 & c1) >>  8
-        B1 :=  0x000000ff & c1
-        
-        R2 := (0x00ff0000 & c2) >> 16
-        G2 := (0x0000ff00 & c2) >>  8
-        B2 :=  0x000000ff & c2
-        
-        ; Calculate the new values
-        R := R1 + Ceil(p * (R2 - R1))
-        G := G1 + Ceil(p * (G2 - G1))
-        B := B1 + Ceil(p * (B2 - B1))
-
-        return (alpha << 24) | (R << 16) | (G << 8) | B
-    }
-
-    /**
-     * Returns a random color, accepts multiple color names, and randomness
-     * @param {str} colorName single or multiple color names separated by "|"
-     * @param {int} randomness adds a random factor to each channel
-     * @returns {int} ARGB
-     */
-    static Random(colorName := "", randomness := false) {
-        
-        local colors, rand
-
-        if (colorName == "")
-            return Random(0xFF000000, 0xFFFFFFFF)
-
-        ; Check if the string contains multiple color names
-        if (colorName ~= "i)^[a-zA-Z|]+$") {           ; <----- TODO simpler regex
-            colors := StrSplit(colorName, "|")
-        } else
-            colors := [colorName]
-
-        ; Select a random color from the list
-        rand := Random(1, colors.Length)
-        if (!this.HasProp(colors[rand])) {
-            OutputDebug("[i] Color " colors[rand] " not found`n")
-            ; or try regex search from here ...
-            return Random(0xFF000000, 0xFFFFFFFF)
-        }
-
-        ; Apply randomness
-        colors := this.%colors[rand]%
-        if (randomness) {
-            return this.Randomize(colors, randomness)
-        }
-        return colors
-    }
-
-    /**
-     * Randomize a color with a given randomness
-     * @param {int} ARGB a valid ARGB
-     * @param {int} rand the randomness value
-     * @returns {int} 
-     */
-    static Randomize(ARGB, rand := 15) {
-
-        local R := (0x00ff0000 & ARGB) >> 16
-        local G := (0x0000ff00 & ARGB) >>  8
-        local B :=  0x000000ff & ARGB
-
-        R := Min(255, Max(0, R + Random(-rand, rand)))
-        G := Min(255, Max(0, G + Random(-rand, rand)))
-        B := Min(255, Max(0, B + Random(-rand, rand)))
-
-        return 0xFF000000 | (R << 16) | (G << 8) | B
-    }
-
-    /**
-     * Returns a random ARGB, also accessible as a function (RandomARGB)
-     * @returns {int} 
-     */
-    static RandomARGB() {
-        return Random(0xFF000000, 0xFFFFFFFF)
-    }
-
-    /**
-     * Returns a random color with a given alpha channel from a range
-     * @param {int} alpha the alpha channel value or the range minimum
-     * @param {int} max the maximum range value
-     * @returns {int} 
-     */
-    static RandomARGBAlphaMax(alpha := 0xFF, max := false) {
-        if (alpha > 255 || alpha < 0 || max > 255 || max < 0)
-            throw ValueError("Alpha must be between 0 and 255")
-        
-        alpha := (max) ? Random(alpha, max) : alpha
-        return (alpha << 24) | Random(0x0, 0xFFFFFF)
-    }
-
-    /**
-     * Returns a color that transition from color1 to color2 on a given distance.
-     * Alias for LinearInterpolation.
-     * @param color1 starting color
-     * @param color2 end color
-     * @param dist distance between the colors
-     * @param alpha alpha channel
-     * @returns {int} ARGB
-     */
-    static Transation(color1, color2, dist := 1, alpha := 255) {
-        return this.LinearInterpolation(color1, color2, dist, alpha)
-    }
-
-    ;{ Color names
-    ;
-    ; Credits for sharing: iseahound https://github.com/iseahound
-    ;
-    ; José Roca Software, GDI+ Flat API Reference
-    ; Enumerations: http://www.jose.it-berater.org/gdiplus/iframe/index.htm
-    ;
-    ; Get a colorname: ARGB := Color.BlueViolet
-    static Aliceblue            := "0xFFF0f8FF",
-           AntiqueWhite         := "0xFFFAEBD7",
-           Aqua                 := "0xFF00FFFF",
-           Aquamarine           := "0xFF7FFFD4",
-           Azure                := "0xFFF0FFFF",
-           Beige                := "0xFFF5F5DC",
-           Bisque               := "0xFFFFE4C4",
-           Black                := "0xFF000000",
-           BlanchedAlmond       := "0xFFFFEBCD",
-           Blue                 := "0xFF0000FF",
-           BlueViolet           := "0xFF8A2BE2",
-           Brown                := "0xFFA52A2A",
-           BurlyWood            := "0xFFDEB887",
-           CadetBlue            := "0xFF5F9EA0",
-           Chartreuse           := "0xFF7FFF00",
-           Chocolate            := "0xFFD2691E",
-           Coral                := "0xFFFF7F50",
-           CornflowerBlue       := "0xFF6495ED",
-           Cornsilk             := "0xFFFFF8DC",
-           Crimson              := "0xFFDC143C",
-           Cyan                 := "0xFF00FFFF",
-           DarkBlue             := "0xFF00008B",
-           DarkCyan             := "0xFF008B8B",
-           DarkGoldenrod        := "0xFFB8860B",
-           DarkGray             := "0xFFA9A9A9",
-           DarkGreen            := "0xFF006400",
-           DarkKhaki            := "0xFFBDB76B",
-           DarkMagenta          := "0xFF8B008B",
-           DarkOliveGreen       := "0xFF556B2F",
-           DarkOrange           := "0xFFFF8C00",
-           DarkOrchid           := "0xFF9932CC",
-           DarkRed              := "0xFF8B0000",
-           DarkSalmon           := "0xFFE9967A",
-           DarkSeaGreen         := "0xFF8FBC8B",
-           DarkSlateBlue        := "0xFF483D8B",
-           DarkSlateGray        := "0xFF2F4F4F",
-           DarkTurquoise        := "0xFF00CED1",
-           DarkViolet           := "0xFF9400D3",
-           DeepPink             := "0xFFFF1493",
-           DeepSkyBlue          := "0xFF00BFFF",
-           DimGray              := "0xFF696969",
-           DodgerBlue           := "0xFF1E90FF",
-           Firebrick            := "0xFFB22222",
-           FloralWhite          := "0xFFFFFAF0",
-           ForestGreen          := "0xFF228B22",
-           Fuchsia              := "0xFFFF00FF",
-           Gainsboro            := "0xFFDCDCDC",
-           GhostWhite           := "0xFFF8F8FF",
-           Gold                 := "0xFFFFD700",
-           Goldenrod            := "0xFFDAA520",
-           Gray                 := "0xFF808080",
-           Green                := "0xFF008000",
-           GreenYellow          := "0xFFADFF2F",
-           Honeydew             := "0xFFF0FFF0",
-           HotPink              := "0xFFFF69B4",
-           IndianRed            := "0xFFCD5C5C",
-           Indigo               := "0xFF4B0082",
-           Ivory                := "0xFFFFFFF0",
-           Khaki                := "0xFFF0E68C",
-           Lavender             := "0xFFE6E6FA",
-           LavenderBlush        := "0xFFFFF0F5",
-           LawnGreen            := "0xFF7CFC00",
-           LemonChiffon         := "0xFFFFFACD",
-           LightBlue            := "0xFFADD8E6",
-           LightCoral           := "0xFFF08080",
-           LightCyan            := "0xFFE0FFFF",
-           LightGoldenrodYellow := "0xFFFAFAD2",
-           LightGray            := "0xFFD3D3D3",
-           LightGreen           := "0xFF90EE90",
-           LightPink            := "0xFFFFB6C1",
-           LightSalmon          := "0xFFFFA07A",
-           LightSeaGreen        := "0xFF20B2AA",
-           LightSkyBlue         := "0xFF87CEFA",
-           LightSlateGray       := "0xFF778899",
-           LightSteelBlue       := "0xFFB0C4DE",
-           LightYellow          := "0xFFFFFFE0",
-           Lime                 := "0xFF00FF00",
-           LimeGreen            := "0xFF32CD32",
-           Linen                := "0xFFFAF0E6",
-           Magenta              := "0xFFFF00FF",
-           Maroon               := "0xFF800000",
-           MediumAquamarine     := "0xFF66CDAA",
-           MediumBlue           := "0xFF0000CD",
-           MediumOrchid         := "0xFFBA55D3",
-           MediumPurple         := "0xFF9370DB",
-           MediumSeaGreen       := "0xFF3CB371",
-           MediumSlateBlue      := "0xFF7B68EE",
-           MediumSpringGreen    := "0xFF00FA9A",
-           MediumTurquoise      := "0xFF48D1CC",
-           MediumVioletRed      := "0xFFC71585",
-           MidnightBlue         := "0xFF191970",
-           MintCream            := "0xFFF5FFFA",
-           MistyRose            := "0xFFFFE4E1",
-           Moccasin             := "0xFFFFE4B5",
-           NavajoWhite          := "0xFFFFDEAD",
-           Navy                 := "0xFF000080",
-           OldLace              := "0xFFFDF5E6",
-           Olive                := "0xFF808000",
-           OliveDrab            := "0xFF6B8E23",
-           Orange               := "0xFFFFA500",
-           OrangeRed            := "0xFFFF4500",
-           Orchid               := "0xFFDA70D6",
-           PaleGoldenrod        := "0xFFEEE8AA",
-           PaleGreen            := "0xFF98FB98",
-           PaleTurquoise        := "0xFFAFEEEE",
-           PaleVioletRed        := "0xFFDB7093",
-           PapayaWhip           := "0xFFFFEFD5",
-           PeachPuff            := "0xFFFFDAB9",
-           Peru                 := "0xFFCD853F",
-           Pink                 := "0xFFFFC0CB",
-           Plum                 := "0xFFDDA0DD",
-           PowderBlue           := "0xFFB0E0E6",
-           Purple               := "0xFF800080",
-           Red                  := "0xFFFF0000",
-           RosyBrown            := "0xFFBC8F8F",
-           RoyalBlue            := "0xFF4169E1",
-           SaddleBrown          := "0xFF8B4513",
-           Salmon               := "0xFFFA8072",
-           SandyBrown           := "0xFFF4A460",
-           SeaGreen             := "0xFF2E8B57",
-           SeaShell             := "0xFFFFF5EE",
-           Sienna               := "0xFFA0522D",
-           Silver               := "0xFFC0C0C0",
-           SkyBlue              := "0xFF87CEEB",
-           SlateBlue            := "0xFF6A5ACD",
-           SlateGray            := "0xFF708090",
-           Snow                 := "0xFFFFFAFA",
-           SpringGreen          := "0xFF00FF7F",
-           SteelBlue            := "0xFF4682B4",
-           Tan                  := "0xFFD2B48C",
-           Teal                 := "0xFF008080",
-           Thistle              := "0xFFD8BFD8",
-           Tomato               := "0xFFFF6347",
-           Transparent          := "0x00FFFFFF",
-           Turquoise            := "0xFF40E0D0",
-           Violet               := "0xFFEE82EE",
-           Wheat                := "0xFFF5DEB3",
-           White                := "0xFFFFFFFF",
-           WhiteSmoke           := "0xFFF5F5F5",
-           Yellow               := "0xFFFFFF00",
-           YellowGreen          := "0xFF9ACD32",
-           
-           ; User defined colors
-
-           ; Github
-           GitHubBlue           := "0xFF0969DA", ; Links and branding elements
-           GitHubGray900        := "0xFF0D1117", ; Dark mode background
-           GitHubGray800        := "0xFF161B22"  ; Secondary background
-    ;}
-    ; Region specific colors
-    static LoadRAL() {
-        local key, ARGB, RAL
-        RAL := {
-           RAL1000 : "0xFFBEBD7F",
-           RAL1001 : "0xFFC2B078",
-           RAL1002 : "0xFFC6A664",
-           RAL1003 : "0xFFE5BE01",
-           RAL1004 : "0xFFFFD700",
-           RAL1005 : "0xFFFFAA1D",
-           RAL1006 : "0xFFFFA420",
-           RAL1007 : "0xFFFF8C00",
-           RAL1011 : "0xFF8A6642",
-           RAL1012 : "0xFFD7D7D7",
-           RAL1013 : "0xFFEAE6CA",
-           RAL1014 : "0xFFE1CC4F",
-           RAL1015 : "0xFFE6D690",
-           RAL1016 : "0xFFFFF700",
-           RAL1017 : "0xFFFFE600",
-           RAL1018 : "0xFFFFF200",
-           RAL1019 : "0xFF9E9764",
-           RAL1020 : "0xFF999950",
-           RAL1021 : "0xFFFFD700",
-           RAL1023 : "0xFFFFC000",
-           RAL1024 : "0xFFAEA04B",
-           RAL1026 : "0xFFFFE600",
-           RAL1027 : "0xFF9D9101",
-           RAL1028 : "0xFFFFA420",
-           RAL1032 : "0xFFFFD300",
-           RAL1033 : "0xFFFFA420",
-           RAL1034 : "0xFFFFE600",
-           RAL1035 : "0xFF6A5D4D",
-           RAL1036 : "0xFF705335",
-           RAL1037 : "0xFFFFA420",
-           RAL2000 : "0xFFED760E",
-           RAL2001 : "0xFFBE4D25",
-           RAL2002 : "0xFFB7410E",
-           RAL2003 : "0xFFFF7514",
-           RAL2004 : "0xFFFF5E00",
-           RAL2005 : "0xFFFF4F00",
-           RAL2007 : "0xFFFFB000",
-           RAL2008 : "0xFFF44611",
-           RAL2009 : "0xFFD84B20",
-           RAL2010 : "0xFFE55137",
-           RAL2011 : "0xFFF35C20",
-           RAL2012 : "0xFFD35831",
-           RAL3000 : "0xFFAF2B1E",
-           RAL3001 : "0xFFA52019",
-           RAL3002 : "0xFF9B111E",
-           RAL3003 : "0xFF75151E",
-           RAL3004 : "0xFF5E2129",
-           RAL3005 : "0xFF5E1A1B",
-           RAL3007 : "0xFF412227",
-           RAL3009 : "0xFF642424",
-           RAL3011 : "0xFF781F19",
-           RAL3012 : "0xFFC1876B",
-           RAL3013 : "0xFF9E2A2B",
-           RAL3014 : "0xFFD36E70",
-           RAL3015 : "0xFFEA899A",
-           RAL3016 : "0xFFB32821",
-           RAL3017 : "0xFFB44C43",
-           RAL3018 : "0xFFCC474B",
-           RAL3020 : "0xFFCC3333",
-           RAL3022 : "0xFFD36E70",
-           RAL3024 : "0xFFFF3F00",
-           RAL3026 : "0xFFFF2B2B",
-           RAL3027 : "0xFFB53389",
-           RAL3028 : "0xFFCB3234",
-           RAL3031 : "0xFFB32428",
-           RAL4001 : "0xFF6D3F5B",
-           RAL4002 : "0xFF922B3E",
-           RAL4003 : "0xFFDE4C8A",
-           RAL4004 : "0xFF641C34",
-           RAL4005 : "0xFF6C4675",
-           RAL4006 : "0xFF993366",
-           RAL4007 : "0xFF4A192C",
-           RAL4008 : "0xFF924E7D",
-           RAL4009 : "0xFFCF3476",
-           RAL5000 : "0xFF354D73",
-           RAL5001 : "0xFF1F4764",
-           RAL5002 : "0xFF00387B",
-           RAL5003 : "0xFF1D334A",
-           RAL5004 : "0xFF18171C",
-           RAL5005 : "0xFF1E2460",
-           RAL5007 : "0xFF3E5F8A",
-           RAL5008 : "0xFF26252D",
-           RAL5009 : "0xFF025669",
-           RAL5010 : "0xFF0E294B",
-           RAL5011 : "0xFF231A24",
-           RAL5012 : "0xFF3B83BD",
-           RAL5013 : "0xFF232C3F",
-           RAL5014 : "0xFF637D96",
-           RAL5015 : "0xFF2874A6",
-           RAL5017 : "0xFF063971",
-           RAL5018 : "0xFF3F888F",
-           RAL5019 : "0xFF1B5583",
-           RAL5020 : "0xFF1D334A",
-           RAL5021 : "0xFF256D7B",
-           RAL5022 : "0xFF282D3C",
-           RAL5023 : "0xFF3F3F4E",
-           RAL5024 : "0xFF5D9B9B",
-           RAL6000 : "0xFF327662",
-           RAL6001 : "0xFF287233",
-           RAL6002 : "0xFF2D572C",
-           RAL6003 : "0xFF424632",
-           RAL6004 : "0xFF1F3A3D",
-           RAL6005 : "0xFF2F4538",
-           RAL6006 : "0xFF3E3B32",
-           RAL6007 : "0xFF343B29",
-           RAL6008 : "0xFF39352A",
-           RAL6009 : "0xFF31372B",
-           RAL6010 : "0xFF35682D",
-           RAL6011 : "0xFF587246",
-           RAL6012 : "0xFF343E40",
-           RAL6013 : "0xFF6C7156",
-           RAL6014 : "0xFF47402E",
-           RAL6015 : "0xFF3B3C36",
-           RAL6016 : "0xFF1E5945",
-           RAL6017 : "0xFF4C9141",
-           RAL6018 : "0xFF57A639",
-           RAL6019 : "0xFFBDECB6",
-           RAL6020 : "0xFF2E3A23",
-           RAL6021 : "0xFF89AC76",
-           RAL6022 : "0xFF25221B",
-           RAL6024 : "0xFF308446",
-           RAL6025 : "0xFF3D642D",
-           RAL6026 : "0xFF015D52",
-           RAL6027 : "0xFF84C3BE",
-           RAL6028 : "0xFF2C5545",
-           RAL6029 : "0xFF20603D",
-           RAL6032 : "0xFF317F43",
-           RAL6033 : "0xFF497E76",
-           RAL6034 : "0xFF7FB5B5",
-           RAL7000 : "0xFF78858B",
-           RAL7001 : "0xFF8A9597",
-           RAL7002 : "0xFF817F68",
-           RAL7003 : "0xFF7D7F7D",
-           RAL7004 : "0xFF9C9C9C",
-           RAL7005 : "0xFF6C7059",
-           RAL7006 : "0xFF766A5A",
-           RAL7008 : "0xFF6A5F31",
-           RAL7009 : "0xFF4D5645",
-           RAL7010 : "0xFF4C514A",
-           RAL7011 : "0xFF434B4D",
-           RAL7012 : "0xFF4E5754",
-           RAL7013 : "0xFF464531",
-           RAL7015 : "0xFF51565C",
-           RAL7016 : "0xFF373F43",
-           RAL7021 : "0xFF2F353B",
-           RAL7022 : "0xFF4B4D46",
-           RAL7023 : "0xFF818479",
-           RAL7024 : "0xFF474A51",
-           RAL7026 : "0xFF374447",
-           RAL7030 : "0xFF939388",
-           RAL7031 : "0xFF5D6970",
-           RAL7032 : "0xFFB9B9A8",
-           RAL7033 : "0xFF7D8471",
-           RAL7034 : "0xFF8F8B66",
-           RAL7035 : "0xFFD7D7D7",
-           RAL7036 : "0xFF7F7679",
-           RAL7037 : "0xFF7D7F7D",
-           RAL7038 : "0xFFB8B8B1",
-           RAL7039 : "0xFF6C6E58",
-           RAL7040 : "0xFF9DA1AA",
-           RAL7042 : "0xFF8D948D",
-           RAL7043 : "0xFF4E5451",
-           RAL7044 : "0xFFCAC4B0",
-           RAL7045 : "0xFF909090",
-           RAL7046 : "0xFF82898F",
-           RAL7047 : "0xFFD0D0D0",
-           RAL8000 : "0xFF826C34",
-           RAL8001 : "0xFF955F20",
-           RAL8002 : "0xFF6C3B2A",
-           RAL8003 : "0xFF734222",
-           RAL8004 : "0xFF8E402A",
-           RAL8007 : "0xFF59351F",
-           RAL8008 : "0xFF6F4F28",
-           RAL8011 : "0xFF5B3A29",
-           RAL8012 : "0xFF592321",
-           RAL8014 : "0xFF382C1E",
-           RAL8015 : "0xFF633A34",
-           RAL8016 : "0xFF4C2F27",
-           RAL8017 : "0xFF45322E",
-           RAL8019 : "0xFF403A3A",
-           RAL8022 : "0xFF212121",
-           RAL8023 : "0xFFA65E2E",
-           RAL8024 : "0xFF79553D",
-           RAL8025 : "0xFF755C48",
-           RAL8028 : "0xFF4E3B31",
-           RAL9001 : "0xFFFDF4E3",
-           RAL9002 : "0xFFE7EBDA",
-           RAL9003 : "0xFFF4F4F4",
-           RAL9004 : "0xFF282828",
-           RAL9005 : "0xFF0A0A0A",
-           RAL9006 : "0xFFA5A5A5",
-           RAL9007 : "0xFF8F8F8F",
-           RAL9010 : "0xFFFFFFF4",
-           RAL9011 : "0xFF1C1C1C",
-           RAL9016 : "0xFFF6F6F6",
-           RAL9017 : "0xFF1E1E1E",
-           RAL9018 : "0xFFD7D7D7" }
-        for key, ARGB in RAL.OwnProps() {
-            this.%key% := ARGB
-        }
-    }
-}
-
-/**
- * A Class the holds buffers for various color matrixes.
- * Required for applying color effects to images.
- */
-class ColorMatrix {
-
-    static __New() {
-
-        local colorMatrixes := {
-
-            bright : [
-                  1.5,     0,     0,     0,     0,
-                    0,   1.5,     0,     0,     0,
-                    0,     0,   1.5,     0,     0,
-                    0,     0,     0,     1,     0,
-                 0.05,  0.05,  0.05,     0,     1] ,
-            
-            grayscale : [
-                0.299, 0.299, 0.299,     0,     0,
-                0.587, 0.587, 0.587,     0,     0,
-                0.114, 0.114, 0.114,     0,     0,
-                       0,     0,     0,     1,     0,
-                      0,     0,     0,     0,     1] ,
-
-            negative : [
-                   -1,     0,     0,     0,     0,
-                    0,    -1,     0,     0,     0,
-                    0,     0,    -1,     0,     0,
-                    0,     0,     0,     1,     0,
-                    1,     1,     1,     0,     1] ,
-
-            sepia : [
-                0.393, 0.349, 0.272,     0,     0,
-                0.769, 0.686, 0.534,     0,     0,
-                0.189, 0.168, 0.131,     0,     0,
-                    0,     0,     0,     1,     0,
-                    0,     0,     0,     0,     1] ,
-
-            invert : [
-                   -1,     0,     0,     0,     0,
-                    0,    -1,     0,     0,     0,
-                    0,     0,    -1,     0,     0,
-                    0,     0,     0,     1,     0,
-                    1,     1,     1,     0,     1] ,
-
-            redonly : [
-                    1,     0,     0,     0,     0,
-                    0,     0,     0,     0,     0,
-                    0,     0,     0,     0,     0,
-                    0,     0,     0,     1,     0,
-                    0,     0,     0,     0,     1] ,
-            
-            greenonly : [ 
-                    0,     0,     0,     0,     0,
-                    0,     1,     0,     0,     0,
-                    0,     0,     0,     0,     0,
-                    0,     0,     0,     1,     0,
-                    0,     0,     0,     0,     1] ,
-            
-            blueonly : [
-                    0,     0,     0,     0,     0,
-                    0,     0,     0,     0,     0,
-                    0,     0,     1,     0,     0,
-                    0,     0,     0,     1,     0,
-                    0,     0,     0,     0,     1]
-        }
-
-        ; Allocate a total of 900 bytes to preload the color matrixes
-        local key, arr, buf
-
-        for key, arr in colorMatrixes.OwnProps() {
-            buf := Buffer(4 * arr.Length)
-            loop 25 {
-                NumPut("float", arr[A_Index], buf, (A_Index - 1) * 4)
-            }
-            this.%key% := buf
-        }
-
-        OutputDebug("[i] Color matrixes loaded successfully`n")
-        return
     }
 }
 
@@ -3977,4 +3722,244 @@ class systext {
         }
     }
 
+}
+
+/**
+ * Deprecated function
+ * 
+ * ; This function is deprecated due to its inefficiency
+ *  itoARGB_deprecated(int) {
+ *      if (Type(int) == "Integer" || Type(int) == "String") {
+ *          ARGB := int & 0xFFFFFFFF
+ *          if (ARGB < 0x00000000 && ARGB > 0xFFFFFFFF)  ; not valid ARGB
+ *              return 0
+ *          Hex := "0x"
+ *          i := 7
+ *          while (i >= 0) {
+ *              Hex .= SubStr("0123456789ABCDEF", ((ARGB >> (i-- * 4)) & 0xF) + 1, 1)
+ *          }
+ *          return Hex
+ *      }
+ *  }
+ * 
+ *  ; Erase a region of a graphics object
+ *  EraseRegion(ppvBits, DIB_Width, x, y, w, h) {
+ *      bytesPerPixel := 4
+ *      bytesPerRow := DIB_Width * bytesPerPixel  ; Total bytes per row in the full DIB *
+ *      ; Pointer to top-left of the erase region
+ *      startPtr := ppvBits + (y * bytesPerRow) + (x * bytesPerPixel)
+ *      ; Loop through the height of the region
+ *      loop h { 
+ *          ; Zero out just this row
+ *          DllCall("RtlZeroMemory", "ptr", startPtr, "uptr", w * bytesPerPixel)  
+ *          ; Move to the next row
+ *          startPtr += bytesPerRow  
+ *      }
+ *   }
+ */
+
+RAL_load() {
+    local key, ARGB, RAL
+    RAL := {
+        RAL1000: "0xFFBEBD7F",
+        RAL1001: "0xFFC2B078",
+        RAL1002: "0xFFC6A664",
+        RAL1003: "0xFFE5BE01",
+        RAL1004: "0xFFFFD700",
+        RAL1005: "0xFFFFAA1D",
+        RAL1006: "0xFFFFA420",
+        RAL1007: "0xFFFF8C00",
+        RAL1011: "0xFF8A6642",
+        RAL1012: "0xFFD7D7D7",
+        RAL1013: "0xFFEAE6CA",
+        RAL1014: "0xFFE1CC4F",
+        RAL1015: "0xFFE6D690",
+        RAL1016: "0xFFFFF700",
+        RAL1017: "0xFFFFE600",
+        RAL1018: "0xFFFFF200",
+        RAL1019: "0xFF9E9764",
+        RAL1020: "0xFF999950",
+        RAL1021: "0xFFFFD700",
+        RAL1023: "0xFFFFC000",
+        RAL1024: "0xFFAEA04B",
+        RAL1026: "0xFFFFE600",
+        RAL1027: "0xFF9D9101",
+        RAL1028: "0xFFFFA420",
+        RAL1032: "0xFFFFD300",
+        RAL1033: "0xFFFFA420",
+        RAL1034: "0xFFFFE600",
+        RAL1035: "0xFF6A5D4D",
+        RAL1036: "0xFF705335",
+        RAL1037: "0xFFFFA420",
+        RAL2000: "0xFFED760E",
+        RAL2001: "0xFFBE4D25",
+        RAL2002: "0xFFB7410E",
+        RAL2003: "0xFFFF7514",
+        RAL2004: "0xFFFF5E00",
+        RAL2005: "0xFFFF4F00",
+        RAL2007: "0xFFFFB000",
+        RAL2008: "0xFFF44611",
+        RAL2009: "0xFFD84B20",
+        RAL2010: "0xFFE55137",
+        RAL2011: "0xFFF35C20",
+        RAL2012: "0xFFD35831",
+        RAL3000: "0xFFAF2B1E",
+        RAL3001: "0xFFA52019",
+        RAL3002: "0xFF9B111E",
+        RAL3003: "0xFF75151E",
+        RAL3004: "0xFF5E2129",
+        RAL3005: "0xFF5E1A1B",
+        RAL3007: "0xFF412227",
+        RAL3009: "0xFF642424",
+        RAL3011: "0xFF781F19",
+        RAL3012: "0xFFC1876B",
+        RAL3013: "0xFF9E2A2B",
+        RAL3014: "0xFFD36E70",
+        RAL3015: "0xFFEA899A",
+        RAL3016: "0xFFB32821",
+        RAL3017: "0xFFB44C43",
+        RAL3018: "0xFFCC474B",
+        RAL3020: "0xFFCC3333",
+        RAL3022: "0xFFD36E70",
+        RAL3024: "0xFFFF3F00",
+        RAL3026: "0xFFFF2B2B",
+        RAL3027: "0xFFB53389",
+        RAL3028: "0xFFCB3234",
+        RAL3031: "0xFFB32428",
+        RAL4001: "0xFF6D3F5B",
+        RAL4002: "0xFF922B3E",
+        RAL4003: "0xFFDE4C8A",
+        RAL4004: "0xFF641C34",
+        RAL4005: "0xFF6C4675",
+        RAL4006: "0xFF993366",
+        RAL4007: "0xFF4A192C",
+        RAL4008: "0xFF924E7D",
+        RAL4009: "0xFFCF3476",
+        RAL5000: "0xFF354D73",
+        RAL5001: "0xFF1F4764",
+        RAL5002: "0xFF00387B",
+        RAL5003: "0xFF1D334A",
+        RAL5004: "0xFF18171C",
+        RAL5005: "0xFF1E2460",
+        RAL5007: "0xFF3E5F8A",
+        RAL5008: "0xFF26252D",
+        RAL5009: "0xFF025669",
+        RAL5010: "0xFF0E294B",
+        RAL5011: "0xFF231A24",
+        RAL5012: "0xFF3B83BD",
+        RAL5013: "0xFF232C3F",
+        RAL5014: "0xFF637D96",
+        RAL5015: "0xFF2874A6",
+        RAL5017: "0xFF063971",
+        RAL5018: "0xFF3F888F",
+        RAL5019: "0xFF1B5583",
+        RAL5020: "0xFF1D334A",
+        RAL5021: "0xFF256D7B",
+        RAL5022: "0xFF282D3C",
+        RAL5023: "0xFF3F3F4E",
+        RAL5024: "0xFF5D9B9B",
+        RAL6000: "0xFF327662",
+        RAL6001: "0xFF287233",
+        RAL6002: "0xFF2D572C",
+        RAL6003: "0xFF424632",
+        RAL6004: "0xFF1F3A3D",
+        RAL6005: "0xFF2F4538",
+        RAL6006: "0xFF3E3B32",
+        RAL6007: "0xFF343B29",
+        RAL6008: "0xFF39352A",
+        RAL6009: "0xFF31372B",
+        RAL6010: "0xFF35682D",
+        RAL6011: "0xFF587246",
+        RAL6012: "0xFF343E40",
+        RAL6013: "0xFF6C7156",
+        RAL6014: "0xFF47402E",
+        RAL6015: "0xFF3B3C36",
+        RAL6016: "0xFF1E5945",
+        RAL6017: "0xFF4C9141",
+        RAL6018: "0xFF57A639",
+        RAL6019: "0xFFBDECB6",
+        RAL6020: "0xFF2E3A23",
+        RAL6021: "0xFF89AC76",
+        RAL6022: "0xFF25221B",
+        RAL6024: "0xFF308446",
+        RAL6025: "0xFF3D642D",
+        RAL6026: "0xFF015D52",
+        RAL6027: "0xFF84C3BE",
+        RAL6028: "0xFF2C5545",
+        RAL6029: "0xFF20603D",
+        RAL6032: "0xFF317F43",
+        RAL6033: "0xFF497E76",
+        RAL6034: "0xFF7FB5B5",
+        RAL7000: "0xFF78858B",
+        RAL7001: "0xFF8A9597",
+        RAL7002: "0xFF817F68",
+        RAL7003: "0xFF7D7F7D",
+        RAL7004: "0xFF9C9C9C",
+        RAL7005: "0xFF6C7059",
+        RAL7006: "0xFF766A5A",
+        RAL7008: "0xFF6A5F31",
+        RAL7009: "0xFF4D5645",
+        RAL7010: "0xFF4C514A",
+        RAL7011: "0xFF434B4D",
+        RAL7012: "0xFF4E5754",
+        RAL7013: "0xFF464531",
+        RAL7015: "0xFF51565C",
+        RAL7016: "0xFF373F43",
+        RAL7021: "0xFF2F353B",
+        RAL7022: "0xFF4B4D46",
+        RAL7023: "0xFF818479",
+        RAL7024: "0xFF474A51",
+        RAL7026: "0xFF374447",
+        RAL7030: "0xFF939388",
+        RAL7031: "0xFF5D6970",
+        RAL7032: "0xFFB9B9A8",
+        RAL7033: "0xFF7D8471",
+        RAL7034: "0xFF8F8B66",
+        RAL7035: "0xFFD7D7D7",
+        RAL7036: "0xFF7F7679",
+        RAL7037: "0xFF7D7F7D",
+        RAL7038: "0xFFB8B8B1",
+        RAL7039: "0xFF6C6E58",
+        RAL7040: "0xFF9DA1AA",
+        RAL7042: "0xFF8D948D",
+        RAL7043: "0xFF4E5451",
+        RAL7044: "0xFFCAC4B0",
+        RAL7045: "0xFF909090",
+        RAL7046: "0xFF82898F",
+        RAL7047: "0xFFD0D0D0",
+        RAL8000: "0xFF826C34",
+        RAL8001: "0xFF955F20",
+        RAL8002: "0xFF6C3B2A",
+        RAL8003: "0xFF734222",
+        RAL8004: "0xFF8E402A",
+        RAL8007: "0xFF59351F",
+        RAL8008: "0xFF6F4F28",
+        RAL8011: "0xFF5B3A29",
+        RAL8012: "0xFF592321",
+        RAL8014: "0xFF382C1E",
+        RAL8015: "0xFF633A34",
+        RAL8016: "0xFF4C2F27",
+        RAL8017: "0xFF45322E",
+        RAL8019: "0xFF403A3A",
+        RAL8022: "0xFF212121",
+        RAL8023: "0xFFA65E2E",
+        RAL8024: "0xFF79553D",
+        RAL8025: "0xFF755C48",
+        RAL8028: "0xFF4E3B31",
+        RAL9001: "0xFFFDF4E3",
+        RAL9002: "0xFFE7EBDA",
+        RAL9003: "0xFFF4F4F4",
+        RAL9004: "0xFF282828",
+        RAL9005: "0xFF0A0A0A",
+        RAL9006: "0xFFA5A5A5",
+        RAL9007: "0xFF8F8F8F",
+        RAL9010: "0xFFFFFFF4",
+        RAL9011: "0xFF1C1C1C",
+        RAL9016: "0xFFF6F6F6",
+        RAL9017: "0xFF1E1E1E",
+        RAL9018: "0xFFD7D7D7" }
+    for key, ARGB in RAL.OwnProps() {
+        Color.%key% := ARGB
+    }
+    return
 }
