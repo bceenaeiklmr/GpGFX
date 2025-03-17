@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * The Font class provides functionality for working with fonts in Gdiplus.  
@@ -87,7 +87,7 @@ class Font {
      * @param {str} family font family name
      * @param {int} size font size
      * @param {str} style font style
-     * @param {clr} colour accepts a color name or (A)RGB
+     * @param {int|str} colour accepts a color name or (A)RGB
      * @param {int} quality rendering quality
      * @param {int} alignmentH horizontal alignment
      * @param {int} alignmentV vertical alignment
