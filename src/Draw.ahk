@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       15.03.2025
-; Version    0.7.0
+; Date       17.03.2025
+; Version    0.7.1
 
 /**
  * This function is responsible for rendering and refreshing the specified
@@ -12,13 +12,13 @@
  * @param {Layer} lyr - The layer object that needs to be drawn and updated.
  * 
  * @credit all DllCall functions are from iseahound work (Graphics, Textrender, ImagePut)
- * https://github.com/iseahound
+ * 		   https://github.com/iseahound
  */
 Draw(lyr) {
 
     local x, y, w, h, x1, y1, gfx, ptr, RectF, pState
 
-    ; Save the layer current dimensions and prepare the layer for drawing
+    ; Save the layer's current dimensions and prepare the layer for drawing
     x1 := lyr.x1
     y1 := lyr.y1
     w1 := lyr.w
@@ -29,6 +29,8 @@ Draw(lyr) {
 
     ; Clear the entire buffer if the layer is not persistent
     if (!lyr.redraw) {
+        
+        ; Erasing only a region looked like a good idea, but it's slower (see EraseRegion function)
         DllCall("RtlZeroMemory", "ptr", Graphics.%lyr.id%.ppvBits, "ptr", lyr.w * lyr.h * 4)
 
         ; Reset the world transform and perform a new translation if the layer has changed position
@@ -395,11 +397,11 @@ class Render {
             obj.Push(Fps.Layer)
         }
 
-        Loop obj.Length {
+        loop obj.Length {
 
             ; If the object is hidden or set to update every n frames, skip drawing
             if (!obj[A_Index].visible
-                || (obj[A_Index].updatefreq && Mod(Fps.frames, obj[A_Index].updatefreq))) {
+            || (obj[A_Index].updatefreq && Mod(Fps.frames, obj[A_Index].updatefreq))) {
                 continue
             }
 
