@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       15.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
  * This example demonstrates how to create multiple layers and render them with a specific fps.
