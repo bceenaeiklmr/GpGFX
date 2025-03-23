@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       16.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
  * This script creates a simple game menu with a player object.
