@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       16.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
  * Creates a simple memory bar using the GlobalMemoryStatusEx function by jNizM.
