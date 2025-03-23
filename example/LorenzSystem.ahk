@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       15.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 width := 1440
 height := 900
