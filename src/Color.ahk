@@ -2,51 +2,48 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 /**
  * A class for color manipulation and generation.
  * @property ColorNames a list of color names
- * credits for sharing: iseahound
- * 
  * @Example
- * c := Color() ; random color
- * c := Color("Lime") ; color name by calling the color class
- * c := Color.Lime ; direct access to value by name
- * c := Color("Red|Blue|Green") ; random color from the list
- * c := Color("0xFF0000FF") ; 0xARGB
- * c := Color("#FF0000FF") ; #ARGB
- * c := Color("0x0000FF") ; 0xRRGGBB
- * c := Color("#0000FF") ; #RRGGBB
- * c := Color(0xFF000000) ; hex
+ * c := Color()                     ; Random color
+ * c := Color("Lime")               ; Color name by calling the color class
+ * c := Color.Lime                  ; Direct access to value by name
+ * c := Color("Red|Blue|Green")     ; Random color from the list
+ * c := Color("0xFF0000FF")         ; 0xARGB
+ * c := Color("#FF0000FF")          ; #ARGB
+ * c := Color("0x0000FF")           ; 0xRGB
+ * c := Color("#0000FF")            ; #RGB
+ * c := Color(0xFF000000)           ; Hex
  */
 class Color {
 
     /**
      * Returns a random color, accepts multiple types of color inputs.
-     * @param {str} c a color name, ARGB, or a list of color names separated by "|"
+     * @param {str} c color name, ARGB, or a list of color names separated by "|"
      * @returns {int} ARGB
-     * credits for the idea: iseahound https://github.com/iseahound/Graphics
      * 
-     * TODO: color name should be around the top segment
+     * @credit iseahound - Graphics, https://github.com/iseahound/Graphics  
      */
     static Call(c := "") {
         if (Type(c) == "String") {
-            return (c == "") ? Random(0xFF000000, 0xFFFFFFFF)     ; random ARGB with max alpha
-                : c ~= "^0x[a-fA-F0-9]{8}$" ? c                   ; correct 0xAARRGGBB 
-                : c ~= "^0x[a-fA-F0-9]{6}$" ? "0xFF" SubStr(c, 3) ; missing alpha channel (0xRRGGBB)
-                : c ~= "^#[a-fA-F0-9]{8}$"  ? "0x" SubStr(c, 2)   ; #AARRGGBB
-                : c ~= "^#[a-fA-F0-9]{6}$"  ? "0xFF" SubStr(c, 2) ; #RRGGBB
-                : c ~= "^[a-fA-F0-9]{8}$"   ? "0x" c              ; missing prefix (AARRGGBB)
-                : c ~= "^[a-fA-F0-9]{6}$"   ? "0xFF" c            ; missing 0xFF (RRGGBB)
-                : c ~= "\|"                 ? this.Random(c)      ; random ARGB
-                : c ~= "^[a-zA-Z]{3,}"      ? this.%c% : ""       ; colorName
+            return (c == "") ? Random(0xFF000000, 0xFFFFFFFF)         ; random ARGB with max alpha
+                : c ~= "^0x[a-fA-F0-9]{8}$" ? c                       ; correct 0xARGB 
+                : c ~= "^0x[a-fA-F0-9]{6}$" ? "0xFF" SubStr(c, 3)     ; missing alpha channel (0xRGB)
+                : c ~= "^#[a-fA-F0-9]{8}$"  ? "0x" SubStr(c, 2)       ; #ARGB
+                : c ~= "^#[a-fA-F0-9]{6}$"  ? "0xFF" SubStr(c, 2)     ; #RGB
+                : c ~= "^[a-fA-F0-9]{8}$"   ? "0x" c                  ; missing prefix (ARGB)
+                : c ~= "^[a-fA-F0-9]{6}$"   ? "0xFF" c                ; missing 0xFF (RGB)
+                : c ~= "\|"                 ? this.Random(c)          ; random ARGB
+                : c ~= "^[a-zA-Z]{3,}"      ? this.%c% : ""           ; colorName
         }
         else if (Type(c) == "Integer" && c <= 0xFFFFFFFF && c >= 0x00000000) {
             return c
         }
-        ; An invalid input
+        ; An invalid input.
         return this.red
     }
 
@@ -76,7 +73,7 @@ class Color {
      * Swaps the color channels of an ARGB color.
      * @param colour 
      * @param {str} mode 
-     * @returns {int} 
+     * @returns {int} ARGB
      */
     static ChannelSwap(colour, mode := "Rand") {
         
@@ -118,18 +115,17 @@ class Color {
         
         local clr, arr
 
+        ; Validate.
         if (backforth !== 0 && backforth !== 1)
             throw ValueError("backforth must be bool")
-
-        ; Validate the colors
         color1 := this.Call(color1)
         color2 := this.Call(color2)
 
-        ; Prepare the return array
+        ; Prepare the return array.
         arr := []
         arr.Length := (backforth + 1) * 100
 
-        ; Push the colors to the array based on the color distance
+        ; Push the colors based on the color distance.
         loop 100 {
             clr := this.LinearInterpolation(color1, color2, A_Index)
             if (backforth) {
@@ -142,10 +138,10 @@ class Color {
 
     /**
      * Returns a color that transition from color1 to color2 on a given distance.
-     * @param color1 starting color
-     * @param color2 end color
-     * @param dist distance between the colors
-     * @param alpha alpha channel
+     * @param {int} color1 starting ARGB
+     * @param {int} color2 end ARGB
+     * @param {int|float} dist distance between the colors
+     * @param {int} alpha alpha channel
      * @returns {array}
      */
     static LinearInterpolation(color1, color2, dist, alpha := 255) {
@@ -222,7 +218,7 @@ class Color {
      * Randomize a color with a given randomness.
      * @param {int} ARGB a valid ARGB
      * @param {int} rand the randomness value
-     * @returns {int} 
+     * @returns {int} ARGB
      */
     static Randomize(ARGB, rand := 15) {
 
@@ -239,7 +235,7 @@ class Color {
 
     /**
      * Returns a random ARGB, also accessible as a function (RandomARGB).
-     * @returns {int} 
+     * @returns {int} ARGB  
      */
     static RandomARGB() {
         return Random(0xFF000000, 0xFFFFFFFF)
@@ -247,14 +243,13 @@ class Color {
 
     /**
      * Returns a random color with a given alpha channel from a range.
-     * @param {int} alpha the alpha channel value or the range minimum
-     * @param {int} max the maximum range value
-     * @returns {int} 
+     * @param {int} alpha alpha channel value or the range minimum
+     * @param {int} max maximum range value
+     * @returns {int} ARGB
      */
     static RandomARGBAlphaMax(alpha := 0xFF, max := false) {
         if (alpha > 255 || alpha < 0 || max > 255 || max < 0)
             throw ValueError("Alpha must be between 0 and 255")
-        
         alpha := (max) ? Random(alpha, max) : alpha
         return (alpha << 24) | Random(0x0, 0xFFFFFF)
     }
@@ -274,7 +269,7 @@ class Color {
         return this.LinearInterpolation(Color(color1), Color(color2), dist, alpha)
     }
 
-    ;{ Color names
+    ; Color names
     ; User defined colors
 
     ; Github
@@ -282,12 +277,15 @@ class Color {
            GitHubGray900        := "0xFF0D1117", ; Dark mode background
            GitHubGray800        := "0xFF161B22"  ; Secondary background
 
-    ; Credits for sharing: iseahound https://github.com/iseahound
-    ;
-    ; José Roca Software, GDI+ Flat API Reference
-    ; Enumerations: http://www.jose.it-berater.org/gdiplus/iframe/index.htm
-    ;
-    ; Get a colorname: ARGB := Color.BlueViolet
+    /**
+     * @credit iseahound - TextRender v1.9.3, colormap
+     * https://github.com/iseahound/TextRender/
+     * 
+     * José Roca Software, GDI+ Flat API Reference
+     * Enumerations: http://www.jose.it-berater.org/gdiplus/iframe/index.htm
+     */
+
+    ;{ Get a colorname: ARGB := Color.MidnightBlue
     static Aliceblue            := "0xFFF0f8FF",
            AntiqueWhite         := "0xFFFAEBD7",
            Aqua                 := "0xFF00FFFF",
@@ -430,10 +428,9 @@ class Color {
            Yellow               := "0xFFFFFF00",
            YellowGreen          := "0xFF9ACD32"
     ;}
-    ; Region specific colors
-    
 }
 
+; Region specific colors.
 RAL_load() {
     local key, ARGB, RAL
     RAL := {
