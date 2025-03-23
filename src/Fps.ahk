@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 /**
  * The Fps class provides a simple way to display the frames per second on the screen.
@@ -18,7 +18,7 @@ class Fps {
     static __New() {
         
         ; Hold the graphics object
-        this.id := 2**63 - 1
+        this.id := 2**63 - 1 ; largest int in AHK
         this.Layer := 0
         this.Shape := 0
         
@@ -45,13 +45,12 @@ class Fps {
 
     /**
      * Using the Render class instead of the Draw function enables the fps
-     * panel to be displayed on the screen. Calling Display will create a
-     * temporary layer for this purpose.
+     * panel to be displayed on the screen. Creates a temporary layer.
      * @param {int|float} delay 
      */
     static Display(delay := 1000) {
         
-        ; In case the layer doesn't exist
+        ; The Layer may not exist yet
         if (!this.Layer) {
 
             ; Store the active layer id, important where new shapes spawn
@@ -65,26 +64,26 @@ class Fps {
             ; Can be overridden via Fps.pos := value
             this.Position(this.pos)
 
-            ; Set the back the id
+            ; Set back id
             Layer.activeid := activeid
         }
 
-        ; Update the fps panel text, draw the fps layer
+        ; Update fps panel text, draw fps layer
         this.Update()
-        Draw(this.Layer) ; we cannot use this here, Layer is inside Fps
+        Draw(this.Layer) ; we cannot use this here
 
         ; Add delay
         if (delay)
             Sleep(delay)
         
-        ; If fps not persistent, clean up
+        ; Clean up
         if (!this.persistent)
             this.Remove()
     }
     
     /**
      * Set the position of the fps panel on the screen.
-     * @param {str} pos A string like "topright" or a number from 7 to 9
+     * @param {int|str} pos string like "topright" or a number from 7 to 9
      * @param {int} x offset from calculated position
      * @param {int} y offset
      * the string is case insensitive
@@ -227,7 +226,7 @@ class Fps {
 
     /**
      * Removes the fps panel. If persistent End() will remove it,
-     * otherwise it will hang the script.
+     * otherwise it will hang the process.
      */
     static __Delete() {
         if (Type(Fps.Layer) == "Layer") {
