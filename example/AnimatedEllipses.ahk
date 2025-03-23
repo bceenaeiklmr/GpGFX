@@ -1,4 +1,4 @@
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
  * Testing animated ellipses with varying color distances and positions.
