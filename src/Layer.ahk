@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 ; Layers class contains the layers objects data.
 class Layers {
@@ -36,7 +36,7 @@ class Layer {
     static activeid := 0
 
     ; Prepares the layer for drawing
-    Prepare() {
+    static Prepare(id) {
 
         local k, v, w, h, x1, y1, x2, y2, DIBw, DIBh, E, str
 
@@ -50,10 +50,10 @@ class Layer {
         ; After some tests it seems its faster to pass the shape ids as a string        
         VarSetStrCapacity(&str,
             ; (obj count * Shape's id length + pipe) * 2
-            ObjOwnPropCount(Shapes.%this.id%) * StrLen(Shape.id) * (2 + 1))
+            ObjOwnPropCount(Shapes.%id%) * StrLen(Shape.id) * (2 + 1))
 
         ; Calculate the bounds of the layer
-        for k, v in Shapes.%this.id%.OwnProps() {
+        for k, v in Shapes.%id%.OwnProps() {
             if (!v.Visible) {
                 continue
             }			
@@ -74,13 +74,13 @@ class Layer {
             str .= v.id "|"
         }
 
-        DIBw := Graphics.%this.id%.w
-        DIBh := Graphics.%this.id%.h
+        DIBw := Graphics.%id%.w
+        DIBh := Graphics.%id%.h
         
         ; Calculate the width and height of the layer, drawing outside of the DIB section will cause an error
         E := 0
-        this.width  := (w := x2 - x1) <= DIBw ? w : (E += 1, DIBw) ; TODO: can be outside of the monitor area
-        this.height := (h := y2 - y1) <= DIBh ? h : (E += 2, DIBh)
+        Layers.%id%.width  := (w := x2 - x1) <= DIBw ? w : (E += 1, DIBw) ; TODO: can be outside of the monitor area
+        Layers.%id%.height := (h := y2 - y1) <= DIBh ? h : (E += 2, DIBh)
         switch E {
             ; This happens when the shapes are outside of the DIB section
             case 1: OutputDebug("[!] Increase DIBw`n")
@@ -88,30 +88,36 @@ class Layer {
             case 3: OutputDebug("[!] Increase DIBw and DIBh`n")
         }
 
-        this.x1 := x1
-        this.y1 := y1
-        this.x2 := x2 
-        this.y2 := y2
+        Layers.%id%.x1 := x1
+        Layers.%id%.y1 := y1
+        Layers.%id%.x2 := x2 
+        Layers.%id%.y2 := y2
 
-        this.prepared := SubStr(str, 1, -1)
-        return
+        ;this.prepared := SubStr(str, 1, -1)
+        return SubStr(str, 1, -1)
     }
 
     /**
      * Resizes the layer and its Graphics object.
-     * @param w width of the layer.
-     * @param h height.
-     * @returns {Layer} Resize and center can be chained.
+     * @param w width
+     * @param h height
+     * @returns {Layer} Resize and center can be chained
      */
     Resize(w, h) {
         Graphics.%this.id% := ""
         Graphics.%this.id% := Graphics(w, h)
         this.w := w
         this.h := h
-        this.Prepare()
+        Layer.Prepare(this.id)
         return this
     }
 
+    /**
+     * Moves the layer to the specified position.
+     * @param x coordinate
+     * @param y coordinate
+     * @returns {Layer} Move and Resize methods can be chained
+     */
     Move(x?, y?) {
         if (IsSet(x))
             this.x := x
@@ -123,7 +129,7 @@ class Layer {
 
     /**
      * Centers the layer on the screen.
-     * @returns {Layer} Center and resize can be chained.
+     * @returns {Layer} Center and Resize methods can be chained
      */
     Center() {
         this.x := (A_ScreenWidth  - this.w) // 2
@@ -133,8 +139,8 @@ class Layer {
     }
 
     /**
-     * Sets the layer position to the monitor
-     * Currently only supports the primary monitor.
+     * Sets the layer position to the monitor.  
+     * Currently only supports the primary monitor, broken.
      * @param {int} disp monitor number.
      */
     setMonitor(disp := 1) {
@@ -152,21 +158,21 @@ class Layer {
 
     /**
      * Debug a layer by drawing rectangles around the DIB and used area.
-     * @param {int} time elapsed time in seconds before the layer is cleared.
-     * @param {int} filled filled or not filled rectangles.
-     * @param {int} alpha transparency of the rectangles.
+     * @param {int} time elapsed time in seconds before the layer is deleted
+     * @param {int} filled filled or not filled rectangles
+     * @param {int} alpha transparency of the rectangles
      */
     Debug(time := 1, filled := 0, alpha := 0x60) {
         
-        local rect1, rect2, tmpLayer
+        local rect1, rect2, lyr
         
-        ; Prepare the layer for drawing (get bounds)
-        this.Prepare()
+        ; Prepare the layer for drawing. (bounds)
+        Layer.Prepare(this.id)
         
-        ; Create a temporary objects
-        tmpLayer := Layer(this.x, this.y, this.w, this.h)
+        ; Create a temporary objects.
+        lyr := Layer(this.x, this.y, this.w, this.h)
        
-        ; Shapes, with indicator text
+        ; Create shapes, with indicator text.
         rect1 := Rectangle(0, 0, this.w, this.h, "blue")
         rect2 := Rectangle(this.x1, this.y1, this.width, this.height, "red", filled)
         rect1.Text("Layer DIB size", "black", 42)
@@ -174,29 +180,32 @@ class Layer {
         rect1.alpha := alpha
         rect2.alpha := alpha
 
-        ; Draw and return
-        tmpLayer.Draw()
+        ; Display.
+        lyr.Draw()
         Sleep(time * 1000)
         return
     }
 
-    ; Layer-window visibility, and accessiblity methods
-    ; In some cases Clickthrough, AlwaysOnTop, TopMost can be useful
-    ; Hide, Show, ShowHide effects the layer, you can avoid draw this way
-    ; credit: iseahound
+    /**
+     * Visibility and accessiblity methods for the layer.  
+     * In some cases Clickthrough, AlwaysOnTop, TopMost can be useful.  
+     * Hide, Show, ShowHide effects the layer, you can avoid draw this way.  
+     * @credit iseahound - TextRender v1.9.3
+     * https://github.com/iseahound/TextRender
+     */
+
     Show() {
-        DllCall("ShowWindow", "ptr", this.hwnd, "int", 4) ; NA - No Activate
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", 4)     ; NA - No Activate
         this.visible := 1
     }
 
     Hide() {
-        DllCall("ShowWindow", "ptr", this.hwnd, "int", 0) ; SW_HIDE - Hide
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", 0)     ; SW_HIDE - Hide
         this.visible := 0
     }
 
     ShowHide() {
         (this.visible) ? this.Hide() : this.Show()
-        ; TODO: this.TextVisible := !this.TextVisible
     }
 
     Clickthrough(v) {
@@ -215,14 +224,27 @@ class Layer {
         WinSetAlwaysOnTop(-1, this.hwnd)
     }
 
-
-    ; Saves the position of the layer to an array or object
-    SavePos(arr := false) {
-        return (arr) ? [this.x, this.y, this.w, this.h]
-                     : {x : this.x, y : this.y, w : this.w, h : this.h}
+    /**
+     * Export the layer to PNG.
+     * @credit iseahound - ImagePut v1.11
+     * https://github.com/iseahound/ImagePut
+     */
+    toFile(filepath) {
+        local pBitmap, pCodec
+        DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", Graphics.%this.id%.hbm, "ptr", 0, "ptr*", &pBitmap:=0)
+	    pCodec := Buffer(16)
+        ; Get the CLSID of the PNG codec.
+	    DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
+	    DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
     }
 
-    ; Restores the position of the layer from an array or object
+    ; Save the position of the layer to an array or object.
+    SavePos(arr := false) {
+        return (arr) ? [this.x, this.y, this.w, this.h]
+            : {x : this.x, y : this.y, w : this.w, h : this.h}
+    }
+
+    ; Restores the position of the layer from an array or object.
     RestorePos(obj) {
         if (Type(obj) == "Array" && obj.Length == 4) {
             this.x := obj[1], this.y := obj[2]
@@ -236,37 +258,40 @@ class Layer {
         return
     }
 
-    ; Clears the layer by setting the alpha to zero
-    ; credit: iseahound
+    /**
+     * Clears the layer by setting the alpha to zero.
+     * @credit iseahound - Textrender v1.9.3, UpdateLayeredWindow
+     * https://github.com/iseahound/TextRender
+     */
     Clean() {
         DllCall("UpdateLayeredWindow"
-            ,    "ptr", this.hWnd            ; hWnd
-            ,    "ptr", 0                    ; hdcDst
-            ,    "ptr", 0                    ; *pptDst
-            ,    "ptr", 0                    ; *psize
-            ,    "ptr", 0                    ; hdcSrc
-            ,    "ptr", 0                    ; *pptSrc
-            ,   "uint", 0                    ; crKey
-            ,  "uint*", 0 << 16 | 0x01 << 24 ; *pblend
-            ,   "uint", 2                    ; dwFlags
-            ,    "int")                      ; Success = 1
+            ,    "ptr", this.hWnd                ; hWnd
+            ,    "ptr", 0                        ; hdcDst
+            ,    "ptr", 0                        ; *pptDst
+            ,    "ptr", 0                        ; *psize
+            ,    "ptr", 0                        ; hdcSrc
+            ,    "ptr", 0                        ; *pptSrc
+            ,   "uint", 0                        ; crKey
+            ,  "uint*", 0 << 16 | 0x01 << 24     ; *pblend
+            ,   "uint", 2                        ; dwFlags
+            ,    "int")                          ; Success = 1
     }
 
     ;{ Property setters
 
-    ; Hidden layers will be skipped during the drawing
+    ; Hidden layers will be skipped during the drawing.
     set_Visible(value) {
         if (IsBool(value))
             Layers.%this.id%.Visible := value
     }
 
-    ; Enables overdraw the Graphics
+    ; Enables overdraw the Graphics.
     set_Redraw(value) {
         if (IsBool(value))
             Layers.%this.id%.Redraw := value
     }
 
-    ; Sets the update frequency of the layer (draws, not ms)
+    ; Sets the update frequency of the layer (draws, not ms).
     set_Alpha(value) {
         if (value <= 255 && value >= 0)
             Layers.%this.id%.Alpha := value
@@ -290,14 +315,13 @@ class Layer {
      * @param {int} w width
      * @param {int} h height
      * @param {str} name debugging purpose
+     * @param {int} hParent parent window
      */
-    __New(x?, y?, w?, h?, name := "") {
+    __New(x?, y?, w?, h?, name := "", hParent := 0) {
 
-        local win, hwnd
+        local win, hwnd, props, getter, setter
 
-        local props, getter, setter
-
-        ; Width, height provided as x and y, auto-center
+        ; Width, height provided as x and y, auto-center.
         if (IsSet(x) && IsSet(y) && !IsSet(w) && !IsSet(h)) {
             w := x
             h := y
@@ -315,50 +339,54 @@ class Layer {
                 y := (A_ScreenHeight - h) // 2
         }
 
-        ; Set the layer active id, create object to layer and shape
+        ; Set the layer active id, create object to layer and shape.
         this.id := ++Layer.id
         Layer.activeid := this.id
-        Layers.%this.id% := {}
+        Layers.%this.id% := {id: this.id}
         Shapes.%this.id% := {}
 
-        ; Debugging purpose
-        this.name := name == "" ? "layer" this.id : name 
+        ; Debugging purpose.
+        this.name := (name == "") ? "layer" this.id : name 
 
         /** 
-        * Window options
-        * WS_POPUP          0x80000000  small window
-        * WS_EX_LAYERED     0x80000     layered window
-        * WS_EX_TOPMOST     0x8         top window
+        * Window styles, extended styles:  
+        * 
+        * WS_POPUP          0x80000000  small window  
+        * WS_EX_LAYERED     0x80000     layered window  
+        * WS_EX_TOPMOST     0x8         top window  
         * WS_EX_TOOLWINDOW  0x80        hide taskbar
-        * credit iseahound
+        * 
+        * @credit iseahound - TextRender v1.9.3, CreateWindow
         */
         static style := 0x80000000, styleEx := 0x80088
 
-        ; Create the window
-        win := Gui("-caption +" style " +E" styleEx)
+        ; Create the window.
+        hParent := (hParent) ? " +parent" hParent : ""
+        win := Gui("-caption +" style " +E" styleEx " +Owner " hParent)
         win.Show("NA")
         hwnd := win.hwnd
         Layers.%this.id%.Window := win
 
-        ; Initialize a Gdiplus Graphics object
+        ; Initialize a Gdiplus Graphics object.
         Graphics.%this.id% := Graphics(w, h)
 
-        ; Blueprint of the shared properties
+        ; Blueprint of the shared properties.
         props := {
             x : x, y : y,
             w : w, h : h,
             x1: 0, y1: 0,
             x2: 0, y2: 0,
-            width : 0, weight : 0,
+            width : 0, height : 0,
             hwnd : hwnd,
             updatefreq : 0,
             alpha : [0xFF],
             redraw : [false],
             visible : [true],
-            name : name ; dbg
+            fontquality : 0,
+            name : name          ; dbg
         }
 
-        ; Set the properties, Array holds a unique setter
+        ; Set the properties, array holds unique setters.
         for name, value in props.OwnProps() {
             if (Type(value) == "Array") {
                 if (value.Length == 2) {
@@ -377,46 +405,55 @@ class Layer {
             this.%name% := value
         }
 
-        ; Bind Draw to this instance
+        ; Bind Draw to this instance.
         this.Draw := Draw.Bind()
 
         OutputDebug("[+] Layer " this.id " created`n")
     }
 
-    ; Deletes an instance
+    ; Deletes an instance.
     __Delete() {
-        local k, id := 0
+        
+        local id := 0
+        local k
+        
         if (Layers.HasProp(this.id) && WinExist(Layers.%this.id%.hWnd)) {
            
-            ; Delete the shapes and graphics
+            ; Delete the shapes and graphics.
             Graphics.DeleteProp(this.id)
             Shapes.DeleteProp(this.id)
             DllCall("DestroyWindow", "ptr", Layers.%this.id%.hWnd)
             OutputDebug("[-] Window " this.id " destroyed`n")  
             
-            ; The previous layer id has to be set as active again to ensure consruct new shapes on the correct layer
+            ; The previous layer id has to be set as active again to ensure
+            ; new shapes spawn on the correct layer.
             for k in Layers.OwnProps() {
                 if (k !== this.id) && (k !== Fps.id)
                         id := k
             }
-            ; Delete and set back id
+            ; Delete and set back id.
             Layers.DeleteProp(this.id)
             Layer.activeid := id
+
             OutputDebug("[-] Layer " this.id " deleted`n") 
         }
     }
 
-    ; Delete layers and shapes
+    ; Delete layers and shapes.
     static __Delete() {
+        
+        local n := 0
+        local k, v
+        
         for k, v in Layers.OwnProps() {
-            if (Layers.HasProp(k) && Layers.%k%.HasProp("hwnd")) { ; not proto
+            if (Layers.%k%.HasProp("hwnd")) {
                 Graphics.DeleteProp(k)
                 Shapes.DeleteProp(k)
                 DllCall("DestroyWindow", "ptr", Layers.%k%.hwnd)
                 Layers.DeleteProp(k)
-                n := (IsSet(n)) ? n + 1 : 1
+                n += 1
             }
         }
-        (IsSet(n)) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ""
+        (n) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ""
     }
 }
