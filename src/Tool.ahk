@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 /**
  * The `Pen` class represents a drawing pen used to draw lines and shapes.  
@@ -20,28 +20,34 @@ class Pen {
      * this.Color := 4249542579 {iARGB}  
      * this.Color := "Gray"     {cName}
      */
-    Color {
-        get => (DllCall("gdiplus\GdipGetPenColor", "ptr", this.ptr, "int*", &value:=0), value)
+    color {
+        get {
+            local value
+            return (DllCall("gdiplus\GdipGetPenColor", "ptr", this.ptr, "int*", &value:=0), value)
+        }
         set =>  DllCall("gdiplus\GdipSetPenColor", "ptr", this.ptr, "int", value)
     }
 
     /**
-     * @property Width - Gets or sets the width of the pen.
+     * @property width - Gets or sets the width of the pen.
      * @get penWidth := this.Width
      * @set this.Width := 1
      */
-    Width {
-        get => (DllCall("gdiplus\GdipGetPenWidth", "ptr", this.ptr, "float*", &value:=0), value)
+    width {
+        get {
+            local value
+            return (DllCall("gdiplus\GdipGetPenWidth", "ptr", this.ptr, "float*", &value:=0), value)
+        }
         set =>  DllCall("gdiplus\GdipSetPenWidth", "ptr", this.ptr, "float", value)
     }
 
     /**
      * Creates a new Pen object with the specified color and width.
-     * @param Color 
-     * @param {int} Width 
+     * @param {int} ARGB an ARGB color value 
+     * @param {int} penwidth the size of the pen
      */
-    __New(ARGB, PenWidth := 1) {
-        DllCall("gdiplus\GdipCreatePen1", "int", ARGB, "float", PenWidth, "int", 2, "ptr*", &pPen:=0) 
+    __New(ARGB, penwidth := 1) {
+        DllCall("gdiplus\GdipCreatePen1", "int", ARGB, "float", penwidth, "int", 2, "ptr*", &pPen:=0) 
         this.ptr := pPen
         this.type := 5
         OutputDebug("[+] Pen created " pPen "`n")
@@ -58,7 +64,7 @@ class Pen {
 
 class Brush {
 
-    ; To fix the may not have property error
+    ; To fix the may not have property error.
     ptr := 0
 
     /**
@@ -97,12 +103,15 @@ class Brush {
 class SolidBrush extends Brush {
 
     /**
-     * @property Color - Gets or sets the color of the brush.
+     * @property color gets or sets the color of the brush
      * @get clr := this.Color
      * @set this.Color := 0xFF000000
      */
     color {
-        get => (DllCall("gdiplus\GdipGetSolidFillColor", "ptr", this.ptr, "int*", &value:=0), value)
+        get {
+            local value
+            return (DllCall("gdiplus\GdipGetSolidFillColor", "ptr", this.ptr, "int*", &value:=0), value)
+        }
         set =>  DllCall("gdiplus\GdipSetSolidFillColor", "ptr", this.ptr, "int", value)
     }
 
@@ -121,7 +130,7 @@ class SolidBrush extends Brush {
 class HatchBrush extends Brush {
 
     /**
-     * Creates a new HatchBrush object with the specified ARGB and hatchstyle
+     * Creates a new HatchBrush object with the specified ARGB and hatchstyle.
      * @param foreARGB foreground ARGB
      * @param backARGB background ARGB
      * @param hatchStyle hatch style name or index
@@ -131,23 +140,23 @@ class HatchBrush extends Brush {
             hatchStyle := this.getStyle(hatchStyle)
         this.color := [foreARGB, backARGB, hatchStyle]     
         DllCall("gdiplus\GdipCreateHatchBrush"
-            ,  "int", hatchStyle  ; hatchStyle
-            ,  "int", foreARGB    ; foreground ARGB
-            ,  "int", backARGB    ; background ARGB
-            , "ptr*", &pBrush:=0) ; ptr to hatch brush
+            ,  "int", hatchStyle      ; hatchStyle
+            ,  "int", foreARGB        ; foreground ARGB
+            ,  "int", backARGB        ; background ARGB
+            , "ptr*", &pBrush:=0)     ; ptr to hatch brush
         this.ptr := pBrush
         this.type := 1
         OutputDebug("[+] HatchBrush created " pBrush "`n")
     }
 
-    ; Get the hatch style index
+    ; Verify hatch style input.
     getStyle(value) {
         if (Type(value) == "String" && HatchBrush.styleName.HasProp(value))
             return HatchBrush.StyleName.%value%
         throw ValueError("Invalid Hatch style")
     }
 
-    ; Names in array
+    ; Names in array.
     static Style :=
         [ "HatchStyleHorizontal"   , "Vertical"             , "ForwardDiagonal"      ; 0-3
         , "BackwardDiagonal"       , "Cross"                , "DiagonalCross"        ; 4-5
@@ -168,7 +177,7 @@ class HatchBrush extends Brush {
         , "SmallGrid"              , "SmallCheckerBoard"    , "LargeCheckerBoard"    ; 48-50
         , "OutlinedDiamond"        , "SolidDiamond"         , "Total" ]              ; 51-53
 
-    ; Make accessible the style names as a dictionary
+    ; Make accessible the style names as a dictionary.
     static __New() {          
         this.StyleName := {}
         for name in this.Style {
@@ -180,22 +189,22 @@ class HatchBrush extends Brush {
 class TextureBrush extends Brush {
 
     /**
-     * Creates a new TextureBrush object with the specified bitmap.
-     * @param {int} pBitmap Accepts a Bitmap object or a valid bitmap pointer or a path to an existing image file
-     * @param {int} WrapmodeTile Wraps the texture image
-     * @param {int} Resize A brush from a file can be resized by a percentage
-     * @param {int} x Coordinate from top left corner
-     * @param {int} y Coordinate
-     * @param {int} w Width
-     * @param {int} h Height
+     * Creates a new TextureBrush object with a specified bitmap or image file.
+     * @param {int} pBitmap accepts a Bitmap object or a valid bitmap pointer or a path to an existing image file
+     * @param {int} wrapmode how the brush is tiled (0 = Tile, 1 = Clamp)
+     * @param {int} resize from file the brush can be resized by a percentage
+     * @param {int} x coordinate from top left corner
+     * @param {int} y coordinate
+     * @param {int} w width
+     * @param {int} h height
      */
-    __New(pBitmap, WrapmodeTile := 0, Resize := 100, x := 0, y := 0, w := 0, h := 0) {
+    __New(pBitmap, wrapmode := 0, resize := 100, x := 0, y := 0, w := 0, h := 0) {
 
         static extension :=  "i)\.(bmp|png|jpg|jpeg)$"
 
         local Bmp, E
 
-        ; Check the input type
+        ; Check input type.
         if (Type(pBitmap) == "Bitmap") {
             pBitmap := pBitmap.ptr
         }
@@ -209,11 +218,11 @@ class TextureBrush extends Brush {
                 return -1
         }
         
-        ; Set the texture brush based on position and size
+        ; Set the texture brush based on position and size.
         if (!x && !y && !w && !h) {
             DllCall("gdiplus\GdipCreateTexture"
                 ,  "ptr", pBitmap
-                ,  "int", WrapmodeTile
+                ,  "int", wrapmode
                 , "ptr*", &pBrush:=0) 
         }
         else {
@@ -221,7 +230,7 @@ class TextureBrush extends Brush {
             (!h) ? h := pBitmap.h - y : 0
             DllCall("gdiplus\GdipCreateTexture2"
                 ,   "ptr", pBitmap
-                ,   "int", wrapmodeTile
+                ,   "int", wrapmode
                 , "float", x
                 , "float", y
                 , "float", w
@@ -229,11 +238,11 @@ class TextureBrush extends Brush {
                 ,  "ptr*", &pBrush:=0)
         }
 
-        ; Set the brush properties
+        ; Set the brush properties.
         this.ptr := pBrush
         this.type := 2
 
-        ; If Bitmap is created it will be deleted automatically
+        ; If Bitmap is created it will be deleted automatically.
         OutputDebug("[+] TextureBrush created " pBrush "`n")
         return
     }
@@ -241,7 +250,7 @@ class TextureBrush extends Brush {
 
 class LinearGradientBrush extends Brush {
 
-    static LinearGradientMode := { Horizontal: 0, Vertical: 1, ForwardDiagonal: 2, BackwardDiagonal: 3}
+    static LinearGradientMode := {Horizontal: 0, Vertical: 1, ForwardDiagonal: 2, BackwardDiagonal: 3}
 
     /** 
      * Validate LinearGradientMode value.
@@ -250,7 +259,6 @@ class LinearGradientBrush extends Brush {
     LinearGradientMode(&value) {
         if (0 <= value && value <= 3)
             return
-
         if LinearGradientBrush.LinearGradientMode.HasOwnProp(value) {
             value := LinearGradientBrush.LinearGradientMode.%value%
             return
@@ -269,12 +277,12 @@ class LinearGradientBrush extends Brush {
     __New(foreARGB, backARGB, gradMode := 1, wrapMode := 1, pRectF := 0) {
         this.LinearGradientMode(&gradMode)
         DllCall("gdiplus\GdipCreateLineBrushFromRect"
-            ,  "ptr", pRectF        ; pointer to rect structure 
-            ,  "int", foreARGB      ; foreground ARGB
-            ,  "int", backARGB      ; background ARGB
-            ,  "int", gradMode      ; LinearGradientMode
-            ,  "int", wrapMode      ; WrapMode
-            , "ptr*", &LGpBrush:=0) ; pointer to the LinearGradientBrush
+            ,  "ptr", pRectF            ; pointer to rect structure 
+            ,  "int", foreARGB          ; foreground ARGB
+            ,  "int", backARGB          ; background ARGB
+            ,  "int", gradMode          ; LinearGradientMode
+            ,  "int", wrapMode          ; WrapMode
+            , "ptr*", &LGpBrush:=0)     ; pointer to the LinearGradientBrush
         this.ptr := LGpBrush
         this.type := 4
         OutputDebug("[+] LinearGradientBrush created " LGpBrush "`n")
@@ -295,16 +303,18 @@ class LinearGradientBrush extends Brush {
      * @set this.Color := [0xFF000000, 0xFFFFFFFF]
      */
     Color {
-        set =>  DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", value[1], "int", value[2])
+
         get {
             local c1, c2
             return (DllCall("gdiplus\GdipGetLineColors", "ptr", this.ptr, "int*", &c1:=0, "int*", &c2:=0), [c1, c2])
-        } 
+        }
+
+        set =>  DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", value[1], "int", value[2])
     } 
 }
 
 /**
- * TODO: Implement PathGradientBrush
+ * TODO: implement later.
  */
 class PathGradient extends Brush {
     __New() {
