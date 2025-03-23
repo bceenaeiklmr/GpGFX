@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       15.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
  * Draw multiple shapes and test the bounds of the canvas.
