@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 class Shapes {
     ; This class stores the shape data for the drawing process.
@@ -11,7 +11,7 @@ class Shapes {
     ; TODO: implement static __Get and __Set to make it not accessible for the user
 }
 
-; Base getter and setter for the shapes properties
+; Base getter and setter for the shapes properties.
 get_Shape(name, this) {
     return Shapes.%this.Layerid%.%this.id%.%name%
 }
@@ -20,7 +20,7 @@ set_Shape(name, this, value) {
     Shapes.%this.Layerid%.%this.id%.%name% := value
 }
 
-; For shapes that uses a buffer for points
+; For shapes that uses a buffer for points.
 set_ShapePoint(name, offset, this, value) {
     NumPut("float", value, Shapes.%this.LayerId%.%this.id%.pPoints, offset)
     return Shapes.%this.LayerId%.%this.id%.%name% := value
@@ -44,17 +44,17 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
     local height := Layers.%Layer.Activeid%.h
     local obj := []
 
-    ; Calculate width and height for objects if not provided or if they are too large
+    ; Calculate width and height for objects if not provided or if they are too large.
     if (!w && !h) {
         w := (width - (col + 1) * pad) // col
         h := (height - (row + 1) * pad) // row
 
-        ; Ensure width and height are equal to maintain the shape as a square
+        ; Ensure width and height are equal to maintain the shape as a square.
         if (w != h) {
             w := h := Min(w, h)
         }
     }
-    ; Calculate width, and height if they are not provided
+    ; Calculate width, and height if they are not provided.
     else if (!w) {
         w := (width - (col + 1) * pad) // col
     }
@@ -62,11 +62,11 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
         h := (height - (row + 1) * pad) // row
     }
 
-    ; Calculate total grid dimensions
+    ; Calculate total grid dimensions.
     totalWidth := col * w + (col - 1) * pad
     totalHeight := row * h + (row - 1) * pad
 
-    ; Calculate base positions for centering if x or y are not specified
+    ; Calculate base positions for centering if x or y are not specified.
     if (!IsSet(x))
         baseX := (width - totalWidth) // 2
     else
@@ -77,7 +77,7 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
     else
         baseY := y
 
-    ; Create objects
+    ; Create objects.
     loop row {
         i := A_Index
         loop col {
@@ -92,8 +92,9 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
 
 
 /**
- * The `Shape` class serves as a container for various shapes and their associated methods.
- * It provides a unified interface for working with different types of shapes.  
+ * The `Shape` class serves as a container for various shapes and their associated methods.  
+ * It provides a unified interface for working with different types of shapes.
+ *   
  * Shapes: `Rectangle`, `Square`, `Ellipse`, `Pie`, `Polygon`, `Triangle`, `Point`, `Line`, `Lines`, `Arc`, `Bezier`, `Beziers`.  
  * Filled Shapes: `Rectangle`, `Square`, `Ellipse`, `Pie`, `Polygon`, `Triangle`
  * 
@@ -101,29 +102,29 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
 class Shape {
 
     /**
-     * Allows to insert of text onto the shape using the specified parameters.  
-     * @param {str} str     text
-     * @param {clr} colour  font color
-     * @param {int} size    font size
-     * @param {str} family  font name
-     * @param {str} style   font style
-     * @param {int} quality rendering quality | TODO: implement
+     * Allows to insert of text onto the shape.  
+     * @param {str} str text
+     * @param {clr} colour font brush color
+     * @param {int} size font size
+     * @param {str} family font family name
+     * @param {str} style font style
+     * @param {int} quality text rendering quality
      */
     Text(str?, colour?, size?, family?, style?, quality?) {
         
         local obj := Shapes.%this.Layerid%.%this.id%
 
-        ; String
+        ; String.
         if (IsSet(str))
             this.str := str
         
-        ; Colour
+        ; Colour.
         if (IsSet(colour))
             colour := Color(colour)
         else
             colour := Font.default.colour
 
-        ; Size
+        ; Size.
         if (IsSet(size)) {
             if (size < 1)
                 throw ValueError("[!] Invalid font size")
@@ -131,25 +132,25 @@ class Shape {
         else
             size := Font.default.size
 
-        ; Family
+        ; Family.
         if (IsSet(family) && family ~= "^\d+$")
             throw ValueError("[!] Invalid font family")
         else if (!IsSet(family))
             family := Font.default.family
 
-        ; Style
+        ; Style.
         if (IsSet(style) && !Font.style.HasOwnProp(style))
             throw ValueError("[!] Invalid font style")
         else if (!IsSet(style))
             style := Font.default.style
 
-        ; Quality (needs rework)
+        ; Quality.
         if (IsSet(quality)) {
-            if (quality < 0 || quality > 5)
+            if (quality < 0 || quality > 4)
                 throw ValueError("[!] Invalid rendering quality value")
         }
         else if (!IsSet(quality))
-            quality := Font.default.quality
+            quality := Font.quality
         this.quality := quality
 
         ; Get a new or an existing font
@@ -162,8 +163,8 @@ class Shape {
     }
 
     /**
-     * Moves and resizes the shape object on its layer.
-     * to alter the width and height of the shape. Consider using '+' and '-' signs to increment or decrement values. 
+     * Moves and resizes the shape object on its layer.  
+     * Note: Consider using '+' and '-' signs to increment or decrement values. 
      * @param {int} x new X position on the layer (opt)
      * @param {int} y new Y position on the layer (opt)
      * @param {int} w new width of the shape (opt)
@@ -179,12 +180,14 @@ class Shape {
     /**
      * Adds an image to the shape.
      * @param {str} filepath file path to an existing image
-     * @param {str} option percentage or width, height (opt), by default, the image is resized to fit the shape
+     * @param {str} option percentage or width, height (opt)
      * @param {str} effect color matrix name (opt)
      * @param {str} x coordinate (opt)
      * @param {str} y coordinate (opt)
      */
     AddImage(filepath, option := 0, effect := 0, x := 0, y := 0) {
+
+        local obj
 
         if (!FileExist(filepath)) {
             throw ValueError("[!] The specified file does not exist.")
@@ -196,25 +199,26 @@ class Shape {
             obj.Bitmap := ""
         }
 
-        ; Try to squeeze the image into the shape if no option is provided
-        if (!option) {
-            if (this.w != this.h) {
-                if (this.w > this.h)
-                    option := "w" Ceil(this.w * .95) " h" Ceil(this.h * (this.w / this.h) * .95)
-                else
-                    option := "w" Ceil(this.w * (this.h / this.w) * .95) " h" Ceil(this.h * .95)
-            }
-            else {
-                option := "w" Ceil(this.w * .9) " h" Ceil(this.h * .9)
-            }
-        }
+        ; Try to squeeze the image into the shape if no option is provided (broken)
+        ;if (!option) {
+        ;    if (this.w != this.h) {
+        ;        if (this.w > this.h)
+        ;            option := "w" . Ceil(this.w * .95) . " h" . Ceil(this.h * (this.w / this.h) * .95)
+        ;        else
+        ;            option := "w" . Ceil(this.w * (this.h / this.w) * .95) . " h" . Ceil(this.h * .95)
+        ;    }
+        ;    else {
+        ;        option := "w" . Ceil(this.w * .9) . " h" . Ceil(this.h * .9)
+        ;    }
+        ;}
         
         obj.Bitmap := Bitmap(filepath, option, effect)
+        this.pBitmap := obj.Bitmap.ptr
         return
     }
 
     ;} Visibility position
-    ; TODO: consider to implement this.TextVisible := 1
+
     Show() {
         this.Visible := 1
     }
@@ -242,7 +246,7 @@ class Shape {
     /**
      * Sets an event handler for the object.
      * @param {str} event event type to handle
-     * @param {fn}  fn function to execute when the event occurs
+     * @param {fn} fn function to execute when the event occurs
      * @param {obj} params additional parameters for the event handler fn
      */
     OnEvent(event := "Click", fn?, params*) {
@@ -259,8 +263,8 @@ class Shape {
         return
     }
 
-    ; Updates the position of the shape's Gui control,
-    ; only move controls when you really need to
+    ; Updates the position of the shape's Gui control.  
+    ; Only move controls when you really need to.
     CtrlUpdate() {
         local x, y
         x := this.x - Layers.%this.layerid%.x1
@@ -269,7 +273,7 @@ class Shape {
         return
     }
 
-    ; Bind a function to the shape object
+    ; Bind a function to the shape object.
     ; Experimental function, unfortunately, the params has to be provided
     ; Signals are executed during each layer preparation.
     Signal(fn, params*) {
@@ -286,18 +290,20 @@ class Shape {
 
     /**
 	 * Sets the position of the object.
-	 * @param {str} x position, or 'center' to center horizontally.
-	 * @param {str} y position, or 'center' to center vertically.
+	 * @param {int|str} x position, or 'center' to center horizontally
+	 * @param {int|str} y position, or 'center' to center vertically
 	 */
 	Position(x := 'center', y := 'center') {
-		if Type(x) == 'String' || Type(y) == 'String' {
+		if (Type(x) == 'String' || Type(y) == 'String') {
 			if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
 				this.x := (this.layerWidth - this.w) // 2
 				this.y := (this.layerHeight - this.h) // 2
-			} else if x ~= 'i)c(ent(er)?)?' {
+			}
+            else if x ~= 'i)c(ent(er)?)?' {
 				this.x := (this.layerWidth - this.w) // 2
 				this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
-			} else if y ~= 'i)c(ent(er)?)?' {
+			}
+            else if y ~= 'i)c(ent(er)?)?' {
 				this.y := (this.layerHeight - this.h) // 2
 				this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
 			}
@@ -308,8 +314,77 @@ class Shape {
 			this.x := Ceil(x)
 			this.y := Ceil(y)
 		} else
-			throw Error('Invalid value for x and y position is not allowed. (integer or float or wording)')
+			throw Error('Integer, float or keyword.')
 	}
+
+    ;{ Animation function
+    /**
+     * Displays the shape with a roll-down animation effect. This function animates the shape by incrementally revealing it from top to bottom.  
+     * @param {str} TargetFrame - The desired frame rate during the animation.
+     * @param {int} unit - The unit size of the increment.
+     */
+    RollDown(unit := 1, delay := -1) {
+        Shape.RollDown([this], unit, delay)
+    }
+
+    static RollDown(obj, unit, delay := -1) {
+        local str, desiredHeight, v
+        for v in obj {
+            str := v.str
+            v.str := ""
+            v.visible := 1
+            desiredHeight := v.h
+            v.h := 0
+            while (desiredHeight > v.H) {
+                Draw(v.layerid)
+                v.h += A_Index * unit
+                Sleep(delay)
+            }
+            v.str := str
+            Draw(v.layerid)
+        }
+    }
+
+    RollUp(unit := 1, delay := -1) {
+        Shape.RollUp([this], unit, delay)
+    }
+
+    /**
+     * Disappears the shape with a roll-up animation effect.  
+     * @param {int} Unit size of change
+     */
+    static RollUp(obj, unit := 1, delay := -1) {
+        
+        local v, str, pos
+
+        for v in obj {
+            pos := [v.w, v.h]
+            str := v.str
+            v.str := ""
+            while (v.h > 0) {
+                Draw(v.layerid)
+                v.h -= (A_index * unit)	
+                Sleep(delay)		
+            }
+            v.h := 1
+            v.w := 1
+            v.alpha := 0
+            Draw(v.layerid)
+            v.visible := 0
+            v.str := str
+            v.w := pos[1]
+            v.h := pos[2]
+        }
+    }
+    ;}
+
+    ImageWidth {
+        get => Shapes.%this.layerid%.%this.id%.Bitmap.w
+    }
+
+    ImageHeight {
+        get => Shapes.%this.layerid%.%this.id%.Bitmap.h
+    }
 
     LayerWidth {
         get => Layers.%this.layerid%.w
@@ -323,15 +398,15 @@ class Shape {
         get => Shapes.%this.layerid%.%this.id%.Tool.type
     }
 
-    ; Required functions for constructing shapes
+    ; Required functions for constructing shapes.
     setMissingProp(&obj) {
 
         obj.colour := Color(obj.colour)
         
-        if (!obj.HasProp("Filled"))
+        if (!obj.HasProp("filled"))
             obj.filled := false
     
-        if (!obj.HasProp("PenWidth"))
+        if (!obj.HasProp("penwidth"))
             obj.penwidth := 1
     
         if (!obj.HasProp("x")) {
@@ -343,7 +418,7 @@ class Shape {
         return
     }
 
-    ; Set the values in the Shapes container
+    ; Set the values in the Shapes container.
     setReferenceObj(obj) {
         return Shapes.%this.Layerid%.%this.id% := {
             id : this.id,
@@ -355,25 +430,25 @@ class Shape {
         }
     }
 
-    ; Get the properties for the shape
+    ; Get the properties for the shape.
     getProperties(obj) {
         return {
             1 : {
-                ; Base
+            ; Base
                 x : obj.x,
                 y : obj.y,
                 w : obj.w,
                 h : obj.h,
                 shape : obj.cls,
                 hasSignal : false,
-                ; String
+            ; String
                 str : "",
                 strX : 0,
                 strY : 0,
                 strH : Font.default.alignmentH, 
                 strV : Font.default.alignmentV,
                 strQ : Font.default.quality,
-                ; Bitmap
+            ; Bitmap
                 pBitmap : 0,
                 bmpX : 0,
                 bmpY : 0,
@@ -385,12 +460,12 @@ class Shape {
                 bmpSrcH : 0,
                 bmpW0 : 0,
                 bmpH0 : 0,
-                ; Bound function
+            ; Bound function
                 fn : "",
                 fnParams : ""
             },
             2 : {
-                ; Unique setters
+            ; Unique setters
                 alpha : 0xFF,
                 color : 0,
                 filled : obj.filled,
@@ -400,7 +475,7 @@ class Shape {
         }
     }
 
-    ; Add additional properties for the shape
+    ; Add additional properties for the shape.
     addSupplementaryProps(&obj, &props) {
         local p := props
         switch obj.cls {
@@ -430,7 +505,7 @@ class Shape {
         return
     }
 
-    ; Initialize the tool for the shape
+    ; Initialize the tool for the shape.
     InitializeTool(&obj) {
 
         local shp := Shapes.%this.layerid%.%this.id%
@@ -440,7 +515,7 @@ class Shape {
             shp.Tool := SolidBrush(obj.colour)
             obj.cls := "Filled" obj.cls
         }
-        else if (obj.penwidth >= 1 && obj.penWidth <= 100) {
+        else if (obj.penwidth >= 1 && obj.penwidth <= 100) {
             shp.Tool := Pen(obj.colour, obj.penwidth)
             obj.filled := 0
         }
@@ -450,7 +525,7 @@ class Shape {
         return
     }
 
-    ; Set the base properties for the shape
+    ; Set the base properties for the shape.
     setBaseProps(props) {
         loop 2 {
             i := A_Index
@@ -466,22 +541,20 @@ class Shape {
         } 
     }
 
-    ; Set the unique properties for the shape if needed
+    ; Set the unique properties for the shape if needed.
     setUniqueProps(obj) {
 
         local ref := Shapes.%this.Layerid%.%this.id%
 
         if (this.shape ~= "Triangle|Polygon|Beziers|Lines") {
             
-            ; Create a buffer for the points struct, and store the pointer
+            ; Create a buffer for the points struct, and store the pointer.
             this.points := obj.points.Length // 2
             this.bPoints := Buffer(8 * this.points)
             this.pPoints := this.bPoints.ptr
 
-            ; Special thanks to: plankoe and evanamd for explaining how
-            ; to use dynamic properties.
-
-            ; Define the x, y properties for points
+            ; Define the x, y properties for points.
+            ; Special thanks to plankoe and evanamd for the explanation.
             loop this.points {
                 xindex := A_Index * 2 - 1
                 yindex := A_Index * 2
@@ -501,7 +574,7 @@ class Shape {
                 this.%yname% := obj.points[yindex]
             }
 
-            ; Bind a function to get the unique bounds
+            ; Bind a function to get the unique bounds.
             if (this.shape == "Triangle" || this.shape == "FilledTriangle") {
                 ref.getBounds := getBoundsTriangle.Bind()
             }
@@ -518,7 +591,7 @@ class Shape {
         return
     }
 
-    ; Keep track of the shape through the Layers and Shapes container
+    ; Keep track of the shape through the Layers and Shapes container.
     static id := 0
 
     /**
@@ -526,19 +599,19 @@ class Shape {
      */
     __New(obj) {
 
-        ; Check if the active layer exists (the user can delete it).
+        ; Check if the active layer exists (user can delete it).
         if (!Layers.HasOwnProp(Layer.activeid))
             throw ValueError("[?] The current active layer doesn't exist.")
 
         this.layerid := Layer.activeid
         this.id := id := ++Shape.id
 
-        ; Some properties depend on others during initialization, so we need to set them first
+        ; Some properties depend on others during initialization.
         this.setMissingProp(&obj)
         this.setReferenceObj(obj)
         this.InitializeTool(&obj)
 
-        ; Add unique properties The following shapes require additional properties for handling position from a buffer
+        ; Add unique properties and consruct.
         props := this.getProperties(obj)
         this.addSupplementaryProps(&obj, &props)       
         this.setBaseProps(props)
@@ -548,8 +621,7 @@ class Shape {
     }
 
     /**
-     * Shapes class contains the shape objects data.  
-     * This method removes the Prototype and __Init properties for faster lookup
+     * Removes `Prototype` and `__Init` methods for faster lookup
      * in the Shapes.OwnProps() enumeration.
      */
     static __New() {
@@ -600,7 +672,7 @@ class Shape {
     }
 
     set_Alpha(value) {
-        local obj
+        local obj, c
         if (!isAlphaNum(value))
             return
         
@@ -610,7 +682,17 @@ class Shape {
             return
 
         ; Set the new tool color and alpha value
-        obj.Tool.Color := (obj.Color & 0x00FFFFFF) | (value << 24)
+        if (obj.Tool.Type == 0 || obj.Tool.Type == 5) {
+            obj.Tool.Color := (obj.Color & 0x00FFFFFF) | (value << 24)
+        }
+        else if (obj.Tool.Type == 4) {
+            c :=  obj.Tool.Color
+            c[1] := (c[1] & 0x00FFFFFF) | (value << 24)
+            c[2] := (c[2] & 0x00FFFFFF) | (value << 24)
+            obj.Tool.Color := c
+        }
+        ; TODO: finish the implementation for the other tool types
+        
         obj.Alpha := value
     }
 
@@ -667,6 +749,7 @@ class Shape {
                 }
             }
 
+            ; Destroy the current tool.
             obj.Tool := ""
 
             switch tooltype {
@@ -679,7 +762,7 @@ class Shape {
                 ; Texture
                     obj.Tool := TextureBrush(value[2]
                     , value.has(3) ? value[3] : 0
-                    , value.has(4) ? value[4] : 100) ; TODO: implement fit to shape
+                    , value.has(4) ? value[4] : 100)     ; TODO: implement fit to shape
                 case 3:
                 ; PathGradient (not implemented yet)
                     return
