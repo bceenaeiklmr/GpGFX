@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       17.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
  * The main purpose of this script is to check if shapes can be constructed
