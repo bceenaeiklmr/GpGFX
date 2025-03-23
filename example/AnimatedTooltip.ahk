@@ -4,10 +4,10 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       17.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 /**
- * A simple example for a gradient notification tooltip.
+ * A simple example of a gradient notification tooltip.
  */
 Notification("Hello, " A_UserName "!")
 
