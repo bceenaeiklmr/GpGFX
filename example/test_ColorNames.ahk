@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       15.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 ; Create a layer and a background rectangle
 main := Layer(1280, 720)
