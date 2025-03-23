@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 /**
  * The Font class provides functionality for working with fonts in Gdiplus.  
@@ -13,18 +13,17 @@
 class Font {
 
     ; Default rendering quality for string during drawing
-    ; TODO: Layer's have their own quality settings, since they own the Graphics object
     static quality := 0
 
     ; Default properties, can be overridden by the user
     static default := {
-        family : "Tahoma",   ; font family name (installed on the system)
-        style : "Regular",   ; see Style flags below
-        size : 10,           ; font size
-        colour : 0xFFFFFFFF, ; font colour
-        quality : 0,         ; rendering quality
-        alignmentH : 1,      ; left 0, center 1, right 2
-        alignmentV : 1       ; top 0, middle 1, bottom 2
+        family : "Tahoma",       ; font family name (installed on the system)
+        style : "Regular",       ; see Style flags below
+        size : 10,               ; font size
+        colour : 0xFFFFFFFF,     ; font colour
+        quality : 0,             ; rendering quality
+        alignmentH : 1,          ; left 0, center 1, right 2
+        alignmentV : 1           ; top 0, middle 1, bottom 2
     }
 
     ; Style flags
@@ -55,8 +54,7 @@ class Font {
         SingleBitPerPixelGridFit : 1,
         SingleBitPerPixel        : 2,
         AntiAliasGridFit         : 3,
-        AntiAlias                : 4,
-        ClearTypeGridFit         : 5 }
+        AntiAlias                : 4 }
     
     ; Make style and rendering flags accessible by value
     static __New() {
@@ -70,13 +68,14 @@ class Font {
     }
 
     /**
-     * Retrieves the default stock font instance, every shape uses this font by default
+     * Retrieves the default stock font instance, every shape uses this font by default.
      * @returns {Font} stock font instance
      */
     static getStock() {
         if (!this.HasOwnProp("stock")) {
             this.stock := Font()
-        } else {
+        }
+        else {
             this.stock.used++
         }
         return this.stock
@@ -124,14 +123,14 @@ class Font {
 
         ; Colour
         if (!IsSet(colour)) {
-            ; TODO: Font id ...|429442994249
-            colour := itoARGB(Font.default.colour)
+            colour := Font.default.colour
         }
         else {
             colour := Color(colour)
         }
+        colour := itoARGB(colour)
 
-        ; Alignments
+        ; Horizontal alignment
         if (!IsSet(alignmentH)) {
             alignmentH := Font.default.alignmentH
         }
@@ -139,7 +138,7 @@ class Font {
             OutputDebug("[!] Invalid horizontal alignment value`n")
             return
         }
-        ; Vertical
+        ; Vertical alignment
         if (!IsSet(alignmentV)) {
             alignmentV := Font.default.alignmentV
         }
@@ -162,7 +161,9 @@ class Font {
             return Font.cache.%id%
         }	
 
-        ; credits: iseahound
+        ; Create the font using GDI+ functions, code based on:
+        ; credit: iseahound - TextRender v1.9.3, DrawOnGraphics
+        ; https://github.com/iseahound/TextRender
         DllCall("gdiplus\GdipCreateFontFamilyFromName"
                 ,   "ptr", StrPtr(family)  ; font family name
                 ,   "int", 0               ; system font collection 0
@@ -189,7 +190,7 @@ class Font {
         
         return Font.cache.%id% := {hFont:hFont, hFamily:hFamily, hFormat:hFormat
             , pBrush:pBrush, id:id, alignmentH:alignmentH, alignmentV:alignmentV
-            , used:1, style : style}
+            , used:1, style : style, quality : Font.quality}
     }
 
     ; User should not touch these two
