@@ -4,7 +4,7 @@
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 ; Date       15.03.2025
 
-#include ../src/GpGFX.ahk
+#include ../GpGFX.ahk
 
 ; Create a layer and a rect, set font color and font size
 lyr := Layer(600, 600)
