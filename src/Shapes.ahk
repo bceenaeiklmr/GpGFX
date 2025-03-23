@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       17.03.2025
-; Version    0.7.1
+; Date       23.03.2025
+; Version    0.7.2
 
 /**
  * The following functions are just tests and examples and will be reworked later.
@@ -11,6 +11,7 @@
 
 ; Normal parameter getter
 getParamsNormal(x?, y?, w?, h?, colour?, filled?) {
+    local obj
     obj := { x : (IsSet(x) ? x : 0),
              y : (IsSet(y) ? y : 0),
              w : (IsSet(w) ? w : 50),
@@ -39,12 +40,12 @@ getParam(x?, y?, w?, h?, colour?, filled?) {
     return {x : 0, y : 0, w : 50, h : 50, colour : "0xFFFFFFFF", filled : 1}
 }
 
-/** Creates a square
- * @param {int} x - x coordinate
- * @param {int} y - y coordinate
- * @param {int} size - size
- * @param {color} colour - colour
- * @param {bool} filled - filled
+/** Creates a square.
+ * @param {int} x coordinate on the layer
+ * @param {int} y coordinate
+ * @param {int} size width, height
+ * @param {color} colour colour
+ * @param {bool} filled filled
  */
 class Square extends Shape { 
     __New(x?, y?, size := 1, colour?, filled?) {		
@@ -52,13 +53,13 @@ class Square extends Shape {
     }
 }
 
-/** Creates a rectangle
- * @param {int} x - x coordinate
- * @param {int} y - y coordinate
- * @param {int} w - width
- * @param {int} h - height
- * @param {color} colour - colour
- * @param {bool} filled - filled
+/** Creates a rectangle.
+ * @param {int} x coordinate on the layer
+ * @param {int} y coordinate
+ * @param {int} w width
+ * @param {int} h height
+ * @param {color} colour colour
+ * @param {bool} filled filled
  */
 class Rectangle extends Shape {
     __New(x?, y?, w?, h?, colour?, filled?) {
@@ -66,13 +67,13 @@ class Rectangle extends Shape {
     }
 }
 
-/** Creates an ellipse
- * @param {int} x - x coordinate
- * @param {int} y - y coordinate
- * @param {int} w - width
- * @param {int} h - height
- * @param {color} colour - colour
- * @param {bool} filled - filled
+/** Creates an ellipse.
+ * @param {int} x coordinate on the layer
+ * @param {int} y coordinate
+ * @param {int} w width
+ * @param {int} h height
+ * @param {color} colour colour
+ * @param {bool} filled filled
  */
 class Ellipse extends Shape {
     __New(x?, y?, w?, h?, colour?, filled?) {
@@ -81,40 +82,40 @@ class Ellipse extends Shape {
 }
 
 /**
- * Creates an Arc
- * @param {int} x - x coordinate
- * @param {int} y - y coordinate
- * @param {int} w - width
- * @param {int} h - height
- * @param {color} colour - colour
- * @param {int} Penwidth - size of pen width
- * @param {int} Startangle - start angle
- * @param {int} Sweepangle - sweep angle
+ * Creates an Arc.
+ * @param {int} x coordinate on the layer
+ * @param {int} y coordinate
+ * @param {int} w width
+ * @param {int} h height
+ * @param {color} colour colour
+ * @param {int} Penwidth size of pen width
+ * @param {int} Startangle start angle
+ * @param {int} Sweepangle sweep angle
  */
 class Arc extends Shape {
-    __New(x?, y?, w?, h?, colour?, Penwidth := 1, Startangle := 1, Sweepangle := 360) {
-        super.__New(getParamsSweepangle(x?, y?, w?, h?, Colour?, Penwidth, Startangle, Sweepangle))
+    __New(x?, y?, w?, h?, colour?, penwidth := 1, startangle := 1, sweepangle := 360) {
+        super.__New(getParamsSweepangle(x?, y?, w?, h?, colour?, penwidth, startangle, sweepangle))
     }
 }
 
-/** Creates a pie shape
- * @param {int} x X coordinate on the layer
- * @param {int} y Y coordinate
- * @param {int} w Width
- * @param {int} h Height
- * @param {int} Startangle Start angle
- * @param {int} Sweepangle Sweep angle	
- * @param {color} Colour - Color
- * @param {bool} Filled - Filled
+/** Creates a pie shape.
+ * @param {int} x coordinate on the layer
+ * @param {int} y coordinate
+ * @param {int} w width
+ * @param {int} h height
+ * @param {int} startangle start angle
+ * @param {int} sweepangle sweep angle	
+ * @param {color} colour colour
+ * @param {bool} filled filled
  */
 class Pie extends Shape { 
-    __New(x?, y?, w ?, h?, Startangle := 1, Sweepangle := 360, Colour?, Filled?) {
-        super.__New(getParamsSweepangle(x?, y?, w?, h?, Colour?, Filled?, Startangle, Sweepangle))
+    __New(x?, y?, w ?, h?, startangle := 1, sweepangle := 360, colour?, filled?) {
+        super.__New(getParamsSweepangle(x?, y?, w?, h?, colour?, filled?, startangle, sweepangle))
     }
 }
 
 ;{ Boundaries
-; Get the boundaries of a triangle by parameters or points
+; Get the boundaries of a triangle by parameters or points.
 getBoundsTriangle(this) {
     this.x := Min(this.x1, this.x2, this.x3)
     this.y := Min(this.y1, this.y2, this.y3)
@@ -123,7 +124,7 @@ getBoundsTriangle(this) {
     return
 }
 
-; Get the boundaries of the shape based on the points
+; Get the boundaries of the shape based on the points.
 getBoundsPoints(this) {
     ; DIB max size is 32647 * 32647 (credit: Robodesign)
     static DIBsize := 32647
@@ -131,7 +132,7 @@ getBoundsPoints(this) {
     y1 :=  DIBsize 
     x2 := -DIBsize
     y2 := -DIBsize
-    ; Get the boundaries from the points
+    ; Get the boundaries from the points.
     local x, y
     loop this.points {
         x := this.%("x" A_Index)% 
@@ -141,7 +142,7 @@ getBoundsPoints(this) {
         (x > x2) ? x2 := x : 0
         (y > y2) ? y2 := y : 0
     }
-    ; Set the boundaries
+    ; Set the boundaries.
     this.x := x1
     this.y := y1
     this.w := x2 - x1
@@ -149,7 +150,7 @@ getBoundsPoints(this) {
     return
 }
 
-; Get the boundaries of a bezier curve
+; Get the boundaries of a bezier curve.
 getBoundsBezier(this) {
     this.x := Min(this.x1, this.x2, this.x3, this.x4)
     this.y := Min(this.y1, this.y2, this.y3, this.y4)
@@ -158,7 +159,7 @@ getBoundsBezier(this) {
     return
 }
 
-; Get the boundaries of a line
+; Get the boundaries of a line.
 getBoundsLine(this) {
     this.x := Min(this.x1, this.x2)
     this.y := Min(this.y1, this.y2)
@@ -180,8 +181,8 @@ getBoundsLine(this) {
  * @param {bool} filled filled
  */
 class Triangle extends Shape {
-    __New(x1 := 0, y1 := 0, x2 := 0, y2 := 0, x3 := 0, y3 := 0, Colour?, Filled?) {
-        super.__New({Points : [x1, y1, x2, y2, x3, y3], Colour : Colour, Filled : Filled, FillMode : 1})
+    __New(x1 := 0, y1 := 0, x2 := 0, y2 := 0, x3 := 0, y3 := 0, colour?, filled?) {
+        super.__New({points : [x1, y1, x2, y2, x3, y3], colour : colour, filled : filled, fillmode : 1})
     }
 }
 
