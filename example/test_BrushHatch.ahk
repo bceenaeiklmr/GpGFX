@@ -34,7 +34,7 @@ testHatchBrush() {
 
     ; Add another rectangle to display text
     ; We can prepare the layer to get the used area dimensions, so we can position it above the grid
-    main.prepare()
+    Layer.prepare(main.id)
     
     rectTxt := Rectangle(main.x1, main.y1 - 75, main.Width, 50, "black")
     rectTxt.Text("Displaying all HatchBrush styles", "white", 20)
