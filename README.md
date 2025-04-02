@@ -5,6 +5,7 @@ GpGFX is a graphics library for AutoHotkey v2, providing drawing and rendering c
 ## Features
 
 - Watch a demo of GpGFX in action on [YouTube](https://www.youtube.com/watch?v=mAJyPSuNsOk).
+- Watch the presentation [CS50x - Final Project](https://www.youtube.com/watch?v=WuQWpn-uma4).
 
 ### General
 - Provides an intuitive, easy-to-use API to draw graphics objects onto the screen.
@@ -15,7 +16,7 @@ GpGFX is a graphics library for AutoHotkey v2, providing drawing and rendering c
 1. Ensure you have the latest version of [AutoHotkey v2](https://www.autohotkey.com/download/ahk-v2.zip) installed.
 2. Clone or download this repository.
 3. Visit the example folder and run the files.  
-4. There is a standalone file, you can rename it to GpGFX.ahk and use it. (optional)
+4. There is a standalone file; you can rename it to GpGFX.ahk and use it. (optional)
 
 ## Example
 
