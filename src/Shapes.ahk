@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * The following functions are just tests and examples and will be reworked later.

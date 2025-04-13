@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * This function is responsible for rendering and refreshing the specified
@@ -38,7 +38,7 @@ Draw(lyr) {
 
         ; Reset the world transform and perform a new translation if the layer has changed position.
         if (x1 !== lyr.x1 || y1 !== lyr.y1) {
-            DllCall("gdiplus\GdipResetWorldTransform", "ptr", gfx)
+            DllCall("gdiplus\GdipResetWorldTransform", "ptr", gfx),
             DllCall("gdiplus\GdipTranslateWorldTransform", "ptr", gfx, "float", -lyr.x1, "float", -lyr.y1, "int", 0)
         }
     }
@@ -98,10 +98,9 @@ Draw(lyr) {
 
         ; Draw shape.
         switch v.shape {
-            ; TODO: reimplement graphics settings, currently commented out
 
             case "Arc":
-                ;DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0)
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawArc"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -113,6 +112,7 @@ Draw(lyr) {
                     , "float", v.sweepangle)
 
             case "Bezier":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawBezier"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -126,6 +126,7 @@ Draw(lyr) {
                     , "float", v.y4)
 
             case "Beziers":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawBeziers"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -133,6 +134,7 @@ Draw(lyr) {
                     , "int", v.points)
 
             case "Ellipse":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawEllipse"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -142,6 +144,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "FilledRectangle", "FilledSquare":
+                lyr.GraphicsQuality("Rectangle")
                 DllCall("gdiplus\GdipFillRectangle"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -151,6 +154,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "Rectangle", "Square":
+                lyr.GraphicsQuality("Rectangle")
                 DllCall("gdiplus\GdipDrawRectangle"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -160,6 +164,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "FilledEllipse":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipFillEllipse"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -169,6 +174,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "FilledPie":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipFillPie"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -180,6 +186,7 @@ Draw(lyr) {
                     , "float", v.sweepangle)
 
             case "Pie":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawPie"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -191,6 +198,7 @@ Draw(lyr) {
                     , "float", v.sweepangle)
 
             case "FilledTriangle", "FilledPolygon":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipFillPolygon"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -199,6 +207,7 @@ Draw(lyr) {
                     , "int", v.fillMode)
 
             case "Triangle", "Polygon":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawPolygon"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -206,6 +215,7 @@ Draw(lyr) {
                     , "int", v.points)
 
             case "Line":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawLine"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -215,6 +225,7 @@ Draw(lyr) {
                     , "float", v.y2)
 
             case "Lines":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawLines"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -232,11 +243,11 @@ Draw(lyr) {
              */
 
             ; Save the current graphics settings and set the new settings for the bitmap drawing.
-            DllCall("gdiplus\GdipSaveGraphics", "ptr", gfx, "ptr*", &pState := 0)
-            DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7)      ; HighQualityBicubic
-            DllCall("gdiplus\GdipSetPixelOffsetMode", "ptr", gfx, "int", 2)        ; Half pixel offset
-            DllCall("gdiplus\GdipSetCompositingMode", "ptr", gfx, "int", 1)        ; Overwrite/SourceCopy
-            DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0)          ; No anti-alias
+            DllCall("gdiplus\GdipSaveGraphics", "ptr", gfx, "ptr*", &pState := 0),
+            DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7),     ; HighQualityBicubic
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "ptr", gfx, "int", 2),       ; Half pixel offset
+            DllCall("gdiplus\GdipSetCompositingMode", "ptr", gfx, "int", 1),       ; Overwrite/SourceCopy
+            DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0),         ; No anti-alias
             DllCall("gdiplus\GdipSetCompositingQuality", "ptr", gfx, "int", 0)     ; AssumeLinear       
 
             ; Align the image to center inside the object.
@@ -295,7 +306,7 @@ Draw(lyr) {
                 
                 ; Split the string by the color tag.
                 text := []
-                text := StrSplit(v.str, '{color:')
+                text := StrSplit(v.str, '{color:'),
                 text.RemoveAt(1)
                 strRaw := ""
 
@@ -318,9 +329,9 @@ Draw(lyr) {
                 lineHeight := 0
 
                 ; Prepare a test rect for measuring.
-                testRectF := Buffer(16, 0)
-                NumPut("float", v.w, testRectF, 8)
-                NumPut("float", v.h, testRectF, 12)
+                testRectF := Buffer(16, 0),
+                NumPut("float", v.w, testRectF, 8),
+                NumPut("float", v.h, testRectF, 12),
 
                 RectF := Buffer(16)
 
@@ -354,8 +365,8 @@ Draw(lyr) {
                 }
 
                 ; Force left-top alignment, save brush color.
-                DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", 0)
-                DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", 0)
+                DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", 0),
+                DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", 0),
                 DllCall("gdiplus\GdipGetSolidFillColor", "ptr", v.Font.pBrush, "int*", &oriColor := 0)
 
                 ; Initial position.
@@ -389,13 +400,13 @@ Draw(lyr) {
                     }
 
                     ; Adjust brush color.
-                    DllCall("gdiplus\GdipSetSolidFillColor", "ptr", v.Font.pBrush, "int", Color(text[index][1]))
+                    DllCall("gdiplus\GdipSetSolidFillColor", "ptr", v.Font.pBrush, "int", Color(text[index][1])),
 
                     ; Update the RectF structure for the current character.
-                    NumPut("float", x, RectF, 0)
-                    NumPut("float", y, RectF, 4)
-                    NumPut("float", chrWidth.%A_LoopField%, RectF, 8)
-                    NumPut("float", lineHeight, RectF, 12)
+                    NumPut("float", x, RectF, 0),
+                    NumPut("float", y, RectF, 4),
+                    NumPut("float", chrWidth.%A_LoopField%, RectF, 8),
+                    NumPut("float", lineHeight, RectF, 12),
 
                     ; Draw the character.
                     DllCall("gdiplus\GdipDrawString"
@@ -427,16 +438,12 @@ Draw(lyr) {
                     v.Font.alignmentV := v.strV
                 }
 
-                ; Set the text vertical and horizontal string format alignment. ; -> TODO check if switch required
-                DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", v.font.AlignmentH)
-                DllCall("Gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", v.font.AlignmentV)
-
                 ; Create a RectF structure to hold the bounding rectangle of the string.
-                RectF := Buffer(16)
-                NumPut("float", v.x + v.strX, RectF, 0)
-                NumPut("float", v.y + v.strY, RectF, 4)
-                NumPut("float", v.w, RectF, 8)
-                NumPut("float", v.h, RectF, 12)
+                RectF := Buffer(16),
+                NumPut("float", v.x + v.strX, RectF, 0),
+                NumPut("float", v.y + v.strY, RectF, 4),
+                NumPut("float", v.w, RectF, 8),
+                NumPut("float", v.h, RectF, 12),
 
                 ; Draw the string without any measurement.
                 DllCall("gdiplus\GdipDrawString"
@@ -464,7 +471,7 @@ Draw(lyr) {
     ; Update the window
     ; credit: iseahound, TextRender v1.9.3, RenderOnScreen
     ; https://github.com/iseahound/TextRender
-
+    
     DllCall("UpdateLayeredWindow"
         ,     "ptr", lyr.hwnd                  ; hWnd
         ,     "ptr", 0                         ; hdcDst
@@ -485,15 +492,15 @@ Draw(lyr) {
  */
 class Render {
 
-    ; Will be important to not update the window automatically. (e.g.: saving)
+    ; Can be disable to only render the layer, but not display it on the screen.
     static UpdateWindow := true
 
     ; For a single layer rendering.
     static Layer(obj) {
 
         ; Start timer, draw layer.
-        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
-        Draw(obj)
+        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf),
+        Draw(obj),
 
         ; Calculate elapsed time in milliseconds since the last frame update.
         elapsed := ((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
@@ -503,9 +510,8 @@ class Render {
         waited := 0
         if (Fps.frametime && Fps.frametime > elapsed) {
             start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
-            while (Fps.frametime >= elapsed + waited) {
+            while (Fps.frametime >= elapsed + waited)
                 waited := ((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
-            }
         }
 
         ; Update the Fps object with the new frame data.

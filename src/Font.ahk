@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * The Font class provides functionality for working with fonts in Gdiplus.  
@@ -36,7 +36,7 @@ class Font {
           Strikeout  : 8 }
 
     ; StringFormat flags specifies the text layout and formatting options
-    ; TODO: implement later, currently just information (also rendering hint)
+    ; TODO: implement later, currently just information
     static StringFormat := {
         DirectionRightToLeft  : 0x0001,
         DirectionVertical     : 0x0002,
@@ -56,7 +56,7 @@ class Font {
         AntiAliasGridFit         : 3,
         AntiAlias                : 4 }
     
-    ; Make style and rendering flags accessible by value
+    ; Make style and othere flags accessible by value
     static __New() {
         local key, value
         for key, value in this.Style.OwnProps() {
@@ -64,6 +64,9 @@ class Font {
         }
         for key, value in this.StringFormat.OwnProps() {
             this.StringFormat.%value% := key
+        }
+        for key, value in this.RenderingHint.OwnProps() {
+            this.RenderingHint.%value% := key
         }
     }
 
@@ -91,8 +94,10 @@ class Font {
      * @param {int} alignmentH horizontal alignment
      * @param {int} alignmentV vertical alignment
      */
-    static Call(family?, size?, style?, colour?, alignmentH?, alignmentV?) {
+    static Call(family?, size?, style?, colour?, quality?, alignmentH?, alignmentV?) {
         
+        local id
+
         ; Paramater validation, family
         if (!IsSet(family)) {
             family := Font.default.family
@@ -116,7 +121,7 @@ class Font {
             style := Font.default.style
         }
         else if (!Font.Style.HasOwnProp(style)) {
-            OutputDebug("[!] Invalid Font style id by number`n")
+            OutputDebug("[!] Invalid Font style`n")
             return
         }
         style := Font.Style.%style%
@@ -146,6 +151,16 @@ class Font {
             OutputDebug("[!] Invalid vertical alignment value`n")
             return
         }
+
+        ; Quality
+        if (!IsSet(quality)) {
+            quality := Font.default.quality
+        }
+        else if (!Font.RenderingHint.HasOwnProp(quality)) {
+            OutputDebug("[!] Invalid rendering quality`n")
+            return
+        }
+        quality := Font.RenderingHint.%quality%
         
         ; Create a unique id for the font
         id := family "|" size "|" style "|" colour
@@ -167,30 +182,30 @@ class Font {
         DllCall("gdiplus\GdipCreateFontFamilyFromName"
                 ,   "ptr", StrPtr(family)  ; font family name
                 ,   "int", 0               ; system font collection 0
-                ,  "ptr*", &hFamily:=0)    ; ptr to font family
+                ,  "ptr*", &hFamily:=0),   ; ptr to font family
 
         DllCall("gdiplus\GdipCreateFont"
                 ,   "ptr", hFamily         ; ptr to font family
                 , "float", size            ; font size
                 ,   "int", style           ; font style
                 ,   "int", 0               ; unit of measure
-                ,  "ptr*", &hFont:=0)      ; ptr to font
+                ,  "ptr*", &hFont:=0),     ; ptr to font
 
         DllCall("gdiplus\GdipCreateStringFormat"
                 ,   "int", 0x1000 | 0x4000 ; formatAttributes (NoWrap, NoClip)
                 ,   "int", 0 			   ; language id default
-                ,  "ptr*", &hFormat:=0)    ; ptr to string format
+                ,  "ptr*", &hFormat:=0),   ; ptr to string format
 
         ; Set string alignments, create the font own brush
-        DllCall("gdiplus\GdipSetStringFormatAlign"    , "ptr", hFormat, "int", 1)
-        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int", 1)
+        DllCall("gdiplus\GdipSetStringFormatAlign"    , "ptr", hFormat, "int", 1),
+        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int", 1),
         DllCall("gdiplus\GdipCreateSolidFill"         , "int", colour, "ptr*", &pBrush:=0)
 
         OutputDebug("[+] Font " id " created`n")
         
-        return Font.cache.%id% := {hFont:hFont, hFamily:hFamily, hFormat:hFormat
-            , pBrush:pBrush, id:id, alignmentH:alignmentH, alignmentV:alignmentV
-            , used:1, style : style, quality : Font.quality}
+        return Font.cache.%id% := {hFont:hFont, hFamily:hFamily, hFormat:hFormat, family:family
+            , pBrush:pBrush, color:colour, id:id, alignmentH:alignmentH, alignmentV:alignmentV
+            , used:1, style : style, quality : quality, size : size}
     }
 
     ; User should not touch these two
@@ -204,6 +219,8 @@ class Font {
      */
     static RemoveAccess(id) {
 
+        local fnt
+
         ; Deleted already
         if !Font.cache.HasOwnProp(id)
             return
@@ -214,9 +231,9 @@ class Font {
 
         ; Delete font resources
         fnt := Font.cache.%id%
-        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", fnt.hFormat)
-        DllCall("gdiplus\GdipDeleteFont", "ptr", fnt.hFont)
-        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", fnt.hFamily)
+        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", fnt.hFormat),
+        DllCall("gdiplus\GdipDeleteFont", "ptr", fnt.hFont),
+        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", fnt.hFamily),
         DllCall("gdiplus\GdipDeleteBrush", "ptr", fnt.pBrush)
 
         ; Remove property
@@ -234,6 +251,7 @@ class Font {
      * Deletes the font instance and its associated resources.
      */
     static __Delete() {
+        local id, f
         ; Dispose will override used count during deletion
         this.dispose := true
         OutputDebug("[i] Deleting all fonts...`n")

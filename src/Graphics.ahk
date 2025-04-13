@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * Create a graphics context for drawing on a layered window.

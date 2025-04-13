@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * Clean all layers.
@@ -38,34 +38,34 @@ Clear() => Clean()
  * https://github.com/iseahound/ImagePut
  */
 SaveLayer(lyr, filepath) {
-	
+    
     ; Create a bitmap from the layer.
     DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", Graphics.%lyr.id%.hbm, "ptr", 0, "ptr*", &pBitmap:=0)
 
     pCodec := Buffer(16)
     ; Get the CLSID of the PNG codec.
-	DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
-	DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
-	DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+    DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
+    DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
+    DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
     return
 }
 
 /**
  * Takes a screenshot of the screen.
- * @param {str} filepath output file path
- * @param {int} x coordinate
- * @param {int} y coordinate
- * @param {int} w width
- * @param {int} h height
+ * @param  {str} filepath file path of output
+ * @param  {int} x coordinate
+ * @param  {int} y coordinate
+ * @param  {int} w width
+ * @param  {int} h height
  * @return {ptr} pointer to Bitmap  
  * 
- * @credit iseahound - ImagePut v1.11 ScreenshotToBuffer
+ * @credit iseahound - ImagePut v1.11 ScreenshotToBuffer  
  * https://github.com/iseahound/ImagePut
  */
 Screenshot(filepath, x := 0, y := 0, w := 0, h := 0) {
     
     (!w) ? w := A_ScreenWidth : 0
-	(!h) ? h := A_ScreenHeight : 0
+    (!h) ? h := A_ScreenHeight : 0
 
     hdc := DllCall("CreateCompatibleDC", "ptr", 0, "ptr")
     bi := Buffer(40, 0)          ; sizeof(bi) = 40
@@ -77,7 +77,7 @@ Screenshot(filepath, x := 0, y := 0, w := 0, h := 0) {
     hbm := DllCall("CreateDIBSection", "ptr", hdc, "ptr", bi, "uint", 0, "ptr*", &pBits:=0, "ptr", 0, "uint", 0, "ptr")
     obm := DllCall("SelectObject", "ptr", hdc, "ptr", hbm, "ptr")
 
-	; Retrieve the device context for the screen.
+    ; Retrieve the device context for the screen.
     sdc := DllCall("GetDC", "ptr", 0, "ptr")
 
     ; Copies a portion of the screen to a new device context.
@@ -94,16 +94,16 @@ Screenshot(filepath, x := 0, y := 0, w := 0, h := 0) {
     DllCall("DeleteObject", "ptr", hbm)
     DllCall("DeleteDC",     "ptr", hdc)
 
-	if IsSet(filepath) {
+    if IsSet(filepath) {
         pCodec := Buffer(16)
         ; Get the CLSID of the PNG codec.
-	    DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
-	    DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
-		DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
-		return
-	}
-	
-	return pBitmap
+        DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
+        DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
+        DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+        return
+    }
+    
+    return pBitmap
 }
 
 /** Return a random ARGB with 0xFF alpha.
@@ -210,8 +210,8 @@ IsBool(int) {
  * @param {int} 
  * @return {bool}
  */
-IsAlphaNum(int) {
-    return (Type(int) == "Integer" && int <= 255 && int >= 0) ? true : false
+IsAlphaValue(int) {
+    return (Type(int) == "Integer" && int <= 0xFF && int >= 0x0) ? true : false
 }
 
 /**
@@ -219,16 +219,15 @@ IsAlphaNum(int) {
  * @param ARGB 
  */
 IsARGB(ARGB) {
-    if (Type(ARGB) == "Integer")
-        return (ARGB >= 0x00000000 && ARGB <= 0xFFFFFFFF) ? true : false
-    else
     if (Type(ARGB) == "String")
         return (RegExMatch(ARGB, "^(0x|#)?[0-9a-fA-F]{6,8}$")) ? true : false
+    else if (Type(ARGB) == "Integer")
+        return (ARGB >= 0x00000000 && ARGB <= 0xFFFFFFFF) ? true : false
     return false
 }
 
 /**
- * Convert an int to ARGB.
+ * Convert an int to ARGB format.
  * @param {int} 
  * @return {str}
  * Slightly performs better than Format("{:08X}", int)
@@ -237,11 +236,11 @@ IsARGB(ARGB) {
 itoARGB(int) {
     static buf := Buffer(20)
     DllCall("wsprintf", "ptr", buf, "str", "0x%X", "int", int, "Cdecl")
-     return StrGet(buf)
+    return StrGet(buf)
 }
 
 /**
- * Alias for itoARGB, convert an int to ARGB.
+ * Alias for itoARGB, convert an int to ARGB format.
  * @param {int} 
  * @return {str}
  */
@@ -254,6 +253,7 @@ intToARGB(int) => itoARGB(int)
  * TODO: later
  */
 PositionByNumber(n) {
+    local p
     switch n {
         case 1: p := "BottomLeft"
         case 2: p := "BottomCenter"

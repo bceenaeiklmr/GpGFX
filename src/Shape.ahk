@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 class Shapes {
     ; This class stores the shape data for the drawing process.
@@ -101,6 +101,289 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
  */
 class Shape {
 
+    ; Default values for the shape.
+    static alpha := 0xFF
+    static visible := true
+
+    ;{ Properties
+    /**
+     * Sets the alpha value of the shape modifying the tool alpha channel.
+     * @property {int} alpha
+     * @example
+     * this.alpha := 0xFF ; 255 (max, opaque)
+     * this.alpha := 0x0  ; 0   (min, transparent)
+     */
+    Alpha {
+
+        get => Shapes.%this.layerid%.%this.id%.alpha
+
+        set {
+            
+            local obj, clr
+            
+            if (!isAlphaValue(value)) {
+                throw ValueError("[!] Accepted type: integer.")
+            }
+
+            ; Return if no change in alpha value
+            obj := Shapes.%this.Layerid%.%this.id%
+            if (obj.alpha == value)
+                return
+
+            ; Set the new tool color and alpha value
+            if (obj.Tool.type == 0 || obj.Tool.type == 5) {
+                obj.Tool.color := (obj.color & 0x00FFFFFF) | (value << 24)
+            }
+            else if (obj.Tool.type == 4) {
+                clr :=  obj.Tool.color
+                clr[1] := (clr[1] & 0x00FFFFFF) | (value << 24)
+                clr[2] := (clr[2] & 0x00FFFFFF) | (value << 24)
+                obj.Tool.color := clr
+            }
+            else {
+                throw ValueError("[!] Only Pen, SolidBrush," .
+                    "and LinearGradientBrush supported.")
+            }
+
+            obj.alpha := value
+        }
+    }
+
+    /**
+     * @property {int|str} Color
+     * @example
+     * ; Solid Brush, Pen:
+     * this.Color := ""                   ; Random color
+     * this.Color := "Lime"               ; Color name by calling the color class
+     * this.Color := Color.Lime           ; Direct access to value by name
+     * this.Color := "red|blue|green"     ; Random color from multiple names
+     * this.Color := "0xFF0000FF"         ; 0xARGB
+     * this.Color := "#FF0000FF"          ; #ARGB
+     * this.Color := "0x0000FF"           ; 0xRGB
+     * this.Color := "#0000FF"            ; #RGB
+     * this.Color := 0xFF000000           ; Hex
+     * 
+     * ; Linear Gradient: [["Gradient"], foreARGB, backARGB, [GradientMode]]
+     * ; Horizontal = 0, Vertical = 1, ForwardDiagonal = 2, BackwardDiagonal = 3
+     * this.Color := ["Gradient", "Red", "Blue"]
+     * this.Color := ["Red", "Blue"] ; Gradient keyword can be omitted
+     * this.Color := ["Gradient", "Red", "Blue", 1] ; Vertical gradient
+     * this.Color := ["Gradient", "Red", "Blue", "ForwardDiagona"]
+     * 
+     * ; Hatch: ["Hatch", foreARGB, backARGB, hatchStyle]
+     * ; Hatch keyword must be defined.
+     * ; See tools HatchBrush for more details.
+     * this.Color := ["Hatch", "Red", "Blue", 42]
+     * 
+     * ; Texture: ["Texture", pBitmap, wrapmode, resize, x, y, w, h]
+     * ; Texture keyword must be defined.
+     * ; pBitmap accepts a Bitmap object or a valid bitmap pointer or a path to an existing image file.
+     * ; wrapmode how the brush is tiled (0 = Tile, 1 = Clamp)
+     * this.Color := ["Texture", filePath, 0, 100, 0, 0, 100, 100] ; from file
+     * this.Color := ["Texture", pBitmap, 0, 200, 0, 0, 100, 100] ; pointer to a Bitmap
+     * this.Color := ["Texture", BitmapInstance, 0, 33] ; pointer to a Bitmap
+     */
+    Color {
+
+        get => Shapes.%this.layerid%.%this.id%.Tool.color
+
+        set {
+
+            local obj
+
+            ; SolidBrush, Pen
+            if (value && Type(value) == "Integer" || (Type(value) == "String")) {
+
+                obj := Shapes.%this.Layerid%.%this.id%
+                value := Color(value)
+
+                ; Dispose the current tool if not brush or pen
+                if (!obj.Tool || obj.Tool.Type !== 0 && obj.Tool.Type !== 5) {
+                    obj.Tool := ""
+                    obj.Tool := (obj.Filled) ? SolidBrush(value) : Pen(value, obj.penwidth)
+                }
+
+                ; Set the color
+                obj.Tool.Color := value
+                return
+            }
+            ; GradientBrush, HatchBrush, TextureBrush
+            else if (Type(value) == "Array") {
+
+                obj := Shapes.%this.layerid%.%this.id%
+                tooltype := obj.Tool.Type
+
+                ; Append "Filled" to the shape as a prefix.
+                if (!obj.filled)
+                    this.shape := "Filled" this.shape
+
+                ; The name not defined, default Linear Gradient Mode
+                if (value.Length == 2) {
+
+                    if (value[1] ~= "i)^(texture|hatch|gradient)$") {
+                        throw ValueError("[!] Invalid color type")
+                    }
+
+                    ; Validate color values.
+                    value[1] := Color(value[1])
+                    value[2] := Color(value[2])
+
+                    ; It's already gradient, simply set LinearGradientBrush's color property.
+                    if (tooltype == 4) {
+                        obj.Tool.color := [value[1], value[2]]
+                        return
+                    }
+
+                    ; Set LinearGradient mode
+                    value.InsertAt(1, "")
+                    tooltype := 4
+                }
+                else {
+                    switch value[1], 0 {
+                        case "hatch": tooltype := 1
+                        case "texture": tooltype := 2
+                        case "gradient": tooltype := 4
+                        default: throw ValueError
+                    }
+                }
+
+                ; Dispose the current tool, and create the new one
+                obj.Tool := ""
+
+                switch tooltype {
+                    case 1:
+                        obj.Tool := HatchBrush(Color(value[2]), Color(value[3]), value[4])
+                    case 2:
+                        obj.Tool := TextureBrush(value[2],
+                            value.has(3) ? value[3] : 0,
+                            value.has(4) ? value[4] : 100)     ; TODO: implement fit to shape
+                    case 3:
+                        return
+                    case 4:
+                        rectF := Buffer(16),
+                        NumPut("float", this.x, rectF, 0),
+                        NumPut("float", this.y, rectF, 4),
+                        NumPut("float", this.w, rectF, 8),
+                        NumPut("float", this.h, rectF, 12),
+                        obj.tool := LinearGradientBrush(color(value[2]), color(value[3])
+                            , (value.Has(4)) ? value[4] : 0 ; LinearGradientMode
+                            , 1 ; WrapMode
+                            , rectF.ptr)
+                }
+            }
+            return
+        }
+    }
+
+    /**
+     * Changes the tool between a pen and a brush based on the filled status.
+     * @param {bool} value indicating whether the shape should be filled or not.  
+     */
+    Filled {
+
+        get => Shapes.%this.layerid%.%this.id%.filled
+
+        set {
+
+            local obj, tooltype 
+        
+            if (!IsBool(value))
+                return
+
+            ; Get the shape reference
+            obj := Shapes.%this.layerid%.%this.id%
+            if ((obj.Tool.type == 0 || obj.Tool.type == 5) && obj.filled == value)
+                return
+
+            ; Save the current color and tool type before deleting the tool
+            tooltype := obj.Tool.type
+            if (obj.Tool.HasOwnProp("color"))
+                clr := obj.Tool.color
+            else
+                clr := Random(0xFF000000, 0xFFFFFFFF)
+            obj.Tool := ""
+
+            ; It's a switchback from gradient to pen
+            if (Type(clr) == "Array") {
+                clr := clr[1]
+            }
+
+            ; Change the shape tool type
+            if (value) {
+                ; Append filled to the shape form
+                this.shape := "Filled" this.shape
+                obj.Tool := SolidBrush(clr)
+            }
+            else {
+                ; Remove filled from the shape form
+                this.shape := SubStr(this.shape, 7)
+                obj.Tool := Pen(clr, obj.penwidth)
+            }
+            
+            obj.filled := value
+        }
+
+    }
+
+    /**
+     * Sets the pen width of the shape.
+     * @param {int} value - width of the pen in pixels
+     */
+    PenWidth {
+        
+        get => Shapes.%this.layerid%.%this.id%.penwidth
+
+        set {
+            if (value >= 1 && value <= 100) {
+                local obj := Shapes.%this.layerid%.%this.id%
+                if (obj.Tool.type == 5)
+                    obj.Tool.width := value
+                obj.penwidth := value
+                return
+            }
+            throw ValueError("[!] Invalid value for PenWidth property")
+        }
+    }
+
+    /**
+     * Sets the visibility of the shape.  
+     * @param {bool} value - The visibility state of the shape.
+     */
+    Visible {
+
+        get => Shapes.%this.layerid%.%this.id%.visible
+
+        set {
+            if !(IsBool(value) || (value !== -1 || value != "toggle")) {
+                return
+            }
+            Shapes.%this.layerid%.%this.id%.visible ^= 1
+            return
+        }
+    }
+
+    ; Read only properties.
+    ImageWidth {
+        get => Shapes.%this.layerid%.%this.id%.Bitmap.w
+    }
+
+    ImageHeight {
+        get => Shapes.%this.layerid%.%this.id%.Bitmap.h
+    }
+
+    LayerWidth {
+        get => Layers.%this.layerid%.w
+    }
+
+    LayerHeight {
+        get => Layers.%this.layerid%.h
+    }
+
+    ToolType {
+        get => Shapes.%this.layerid%.%this.id%.Tool.type
+    }
+    ;}
+
     /**
      * Allows to insert of text onto the shape.  
      * @param {str} str text
@@ -112,7 +395,9 @@ class Shape {
      */
     Text(str?, colour?, size?, family?, style?, quality?) {
         
-        local obj := Shapes.%this.Layerid%.%this.id%
+        local obj
+        
+        obj := Shapes.%this.Layerid%.%this.id%
 
         ; String.
         if (IsSet(str))
@@ -122,42 +407,46 @@ class Shape {
         if (IsSet(colour))
             colour := Color(colour)
         else
-            colour := Font.default.colour
+            colour := obj.Font.color
 
         ; Size.
         if (IsSet(size)) {
             if (size < 1)
                 throw ValueError("[!] Invalid font size")
-        }  
-        else
-            size := Font.default.size
+        } else
+            size := obj.Font.size
 
         ; Family.
-        if (IsSet(family) && family ~= "^\d+$")
+        if (IsSet(family) && family ~= "^\d+$") 
             throw ValueError("[!] Invalid font family")
         else if (!IsSet(family))
-            family := Font.default.family
+            family := obj.Font.family
 
         ; Style.
-        if (IsSet(style) && !Font.style.HasOwnProp(style))
-            throw ValueError("[!] Invalid font style")
-        else if (!IsSet(style))
-            style := Font.default.style
-
+        if (IsSet(style)) {
+            if (!Font.style.HasOwnProp(style))
+                throw ValueError("[!] Invalid font style")
+            style := Font.style.%style%
+        }
+        else {
+            style := Font.Style.%(obj.Font.style)%
+        }
+            
         ; Quality.
         if (IsSet(quality)) {
             if (quality < 0 || quality > 4)
                 throw ValueError("[!] Invalid rendering quality value")
+            if (this.strQ != quality) {
+                this.strQ := quality
+            }
         }
-        else if (!IsSet(quality))
-            quality := Font.quality
-        this.quality := quality
+        quality := this.strQ
 
         ; Get a new or an existing font
         if (obj.Font.id !== (family "|" size "|" style "|" colour)) {
             if (obj.Font.id !== Font.stockid)
                 Font.RemoveAccess(obj.Font.id)
-            obj.Font := Font(family, size, style, colour)
+            obj.Font := Font(family, size, style, colour, quality)
         }
         return
     }
@@ -217,8 +506,7 @@ class Shape {
         return
     }
 
-    ;} Visibility position
-
+    ;{ Visibility methods
     Show() {
         this.Visible := 1
     }
@@ -240,6 +528,35 @@ class Shape {
         (obj.HasOwnProp("y")) ? this.y := obj.y : 0
         (obj.HasOwnProp("w")) ? this.w := obj.w : 0
         (obj.HasOwnProp("h")) ? this.h := obj.h : 0
+    }
+
+    /**
+     * Sets the position of the object.
+     * @param {int|str} x position, or 'center' to center horizontally
+     * @param {int|str} y position, or 'center' to center vertically
+     */
+    Position(x := 'center', y := 'center') {
+        if (Type(x) == 'String' || Type(y) == 'String') {
+            if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
+                this.x := (this.layerWidth - this.w) // 2
+                this.y := (this.layerHeight - this.h) // 2
+            }
+            else if x ~= 'i)c(ent(er)?)?' {
+                this.x := (this.layerWidth - this.w) // 2
+                this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
+            }
+            else if y ~= 'i)c(ent(er)?)?' {
+                this.y := (this.layerHeight - this.h) // 2
+                this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
+            }
+        } else if IsInteger(x) && IsInteger(y) {
+            this.x := x
+            this.y := y
+        } else if IsFloat(x) && IsFloat(y) {
+            this.x := Ceil(x)
+            this.y := Ceil(y)
+        } else
+            throw Error('Integer, float or keyword.')
     }
     ;}
 
@@ -287,35 +604,6 @@ class Shape {
         ;this.Fn := (*) => (fn)(params*) ; nada
         return
     }
-
-    /**
-	 * Sets the position of the object.
-	 * @param {int|str} x position, or 'center' to center horizontally
-	 * @param {int|str} y position, or 'center' to center vertically
-	 */
-	Position(x := 'center', y := 'center') {
-		if (Type(x) == 'String' || Type(y) == 'String') {
-			if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
-				this.x := (this.layerWidth - this.w) // 2
-				this.y := (this.layerHeight - this.h) // 2
-			}
-            else if x ~= 'i)c(ent(er)?)?' {
-				this.x := (this.layerWidth - this.w) // 2
-				this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
-			}
-            else if y ~= 'i)c(ent(er)?)?' {
-				this.y := (this.layerHeight - this.h) // 2
-				this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
-			}
-		} else if IsInteger(x) && IsInteger(y) {
-			this.x := x
-			this.y := y
-		} else if IsFloat(x) && IsFloat(y) {
-			this.x := Ceil(x)
-			this.y := Ceil(y)
-		} else
-			throw Error('Integer, float or keyword.')
-	}
 
     ;{ Animation function
     /**
@@ -376,27 +664,150 @@ class Shape {
             v.h := pos[2]
         }
     }
+
+    /**
+     * Moves the shape to the specified position with a sliding effect.
+     * @param {integer} x The X-coordinate position
+     * @param {integer} y The Y-coordinate position
+     * @param {integer} Unit unit size of the sliding increment
+     */
+    Shrink(Unit := 1) {
+        local fake, w, h
+        H := W := 1
+        this.Text()
+        fake := Rectangle(this.x, this.y, this.w, this.h, '0x00FFFFFF')
+        loop {
+            ; calculate w, h stepsize
+            (this.h > this.w) ? w := this.w / this.h : 0
+            (this.w > this.h) ? h := this.h / this.w : 0
+            ; stop reducing the value if less !value
+            (this.w > 0) ? (this.w -= Ceil(unit * W), this.x += Ceil(unit * W / 2)) : this.w := 0
+            (this.h > 0) ? (this.h -= Ceil(unit * H), this.y += Ceil(unit * H / 2)) : this.h := 0
+            if (!this.h || !this.w) {
+                Draw(this.LayerId)
+                this.Visible := 0
+                return
+            }
+            Draw(this.LayerId)
+        }
+    }
+
+    /**
+     * Shrinks the object(s). This static method reduces the size of the specified object(s) by the given unit size. Only works on the same layer`!`
+     * @param {number} unit - The unit size of the shrinkage.
+     * @param {object} objects - The object(s) to be shrunk.
+     */
+    static Shrink(unit := 1, objects*) {
+
+        local x1, y1, x2, y2, nulled, whichlayer, v, index, w, h
+
+        for v in objects {
+            if (A_index == 1) {
+                x1 := v.x
+                y1 := v.y
+                x2 := v.x + v.w
+                y2 := v.y + v.h
+            }
+            (v.x < x1) ? x1 := v.x : 0
+            (v.y < y1) ? y1 := v.y : 0
+            (v.x + v.w > x2) ? x2 := v.x + v.w : 0
+            (v.y + v.h > y2) ? y2 := v.y + v.h : 0
+        }
+
+        objects.Push(Rectangle(x1, y1, x2 - x1, y2 - y1, '0x00FFFFFF'))
+        nulled := 0
+        whichlayer := ""
+
+        loop {
+
+            index := A_index
+            nulled := 0
+
+            for v in objects {
+
+                if (!InStr(whichlayer, v.layerid))
+                    whichlayer .= v.LayerId "|"
+
+                if (index == 1)
+                    v.str := ""
+
+                H := W := 1
+                (v.h > v.w) ? W := v.w / v.h : 0
+                (v.w > v.h) ? H := v.h / v.w : 0
+
+                (v.w > 0) ? (v.w -= Ceil(unit * W), v.x += Ceil(w / 2 * unit)) : v.w := 0
+                (v.h > 0) ? (v.h -= Ceil(unit * H), v.y += Ceil(h / 2 * unit)) : v.h := 0
+
+                if (0 >= v.h || 0 >= v.w) {
+                    nulled += 1
+                    v.visible := 0
+                }
+            }
+
+            loop parse, whichlayer, "|" {
+                if !A_LoopField
+                    continue
+                Draw(Integer(A_LoopField))
+                if (nulled = objects.Length) { ;-1
+                    for v in objects
+                        v.Hide()
+                    try Draw(A_LoopField)
+                    return
+                }
+            }
+
+        }
+    }
+
+    /**
+     * Grows the object(s). This static method increases the size of the specified object(s) by the given unit size. Only works on the same layer`!`
+     * @param {number} unit - The unit size of the growth.
+     * @param {object} objects - The object(s) to be grown.
+     */
+    Grow(delay := 15.6) {
+        local heightEnd
+        heightEnd := this.h
+        this.h := 0
+        while (heightEnd > this.h) {
+            this.h := heightEnd < this.h + A_Index ? heightEnd : this.h + A_Index
+            Draw(this.LayerId)
+            Sleep(delay)
+        }	
+    }
+
+    /**
+     * Grows the object(s). This static method increases the size of the specified object(s) by the given unit size.
+     * @param {number} unit - The unit size of the growth.
+     * @param {object} objects - The object(s) to be grown.
+     */
+    static Grow(delay := 15.6, Objects*) {
+        local v, nulled, pos
+        pos := []
+        for v in Objects {
+            pos.Push(v.SavePos())
+            v.h := 0
+        }
+
+        loop {
+            nulled := 0
+            for v in Objects {
+                if (pos[A_Index].h == v.h) {
+                    Nulled += 1
+                    v.Visible := 1
+                }
+                else {
+                    v.h += 1
+                }
+            }
+            Draw(objects[1].LayerId)
+            if (Nulled == Objects.Length)
+                return
+            Sleep(delay)
+        }
+        ;for v in Objects
+        ;    v.RestorePos(pos[A_Index])
+    }
     ;}
-
-    ImageWidth {
-        get => Shapes.%this.layerid%.%this.id%.Bitmap.w
-    }
-
-    ImageHeight {
-        get => Shapes.%this.layerid%.%this.id%.Bitmap.h
-    }
-
-    LayerWidth {
-        get => Layers.%this.layerid%.w
-    }
-
-    LayerHeight {
-        get => Layers.%this.layerid%.h
-    }
-
-    ToolType {
-        get => Shapes.%this.layerid%.%this.id%.Tool.type
-    }
 
     ; Required functions for constructing shapes.
     setMissingProp(&obj) {
@@ -421,57 +832,49 @@ class Shape {
     ; Set the values in the Shapes container.
     setReferenceObj(obj) {
         return Shapes.%this.Layerid%.%this.id% := {
-            id : this.id,
-            alpha: 0xFF,
-            Bitmap : {ptr:0},
+            alpha: Shape.alpha,
+            bitmap : {ptr:0},
             color: obj.colour,
             filled: obj.filled,
-            Font : Font.getStock()
+            font : Font.getStock(),
+            id : this.id,
+            penwidth : obj.penwidth,
+            visible : Shape.visible
         }
     }
 
     ; Get the properties for the shape.
     getProperties(obj) {
         return {
-            1 : {
             ; Base
-                x : obj.x,
-                y : obj.y,
-                w : obj.w,
-                h : obj.h,
-                shape : obj.cls,
-                hasSignal : false,
+            x: obj.x,
+            y: obj.y,
+            w: obj.w,
+            h: obj.h,
+            shape: obj.cls,
+            hasSignal: false,
             ; String
-                str : "",
-                strX : 0,
-                strY : 0,
-                strH : Font.default.alignmentH, 
-                strV : Font.default.alignmentV,
-                strQ : Font.default.quality,
+            str: "",
+            strX: 0,
+            strY: 0,
+            strH: Font.default.alignmentH,
+            strV: Font.default.alignmentV,
+            strQ: Font.default.quality,
             ; Bitmap
-                pBitmap : 0,
-                bmpX : 0,
-                bmpY : 0,
-                bmpW : 0,
-                bmpH : 0,
-                bmpSrcX : 0,
-                bmpSrcY : 0,
-                bmpSrcW : 0,
-                bmpSrcH : 0,
-                bmpW0 : 0,
-                bmpH0 : 0,
+            pBitmap: 0,
+            bmpX: 0,
+            bmpY: 0,
+            bmpW: 0,
+            bmpH: 0,
+            bmpSrcX: 0,
+            bmpSrcY: 0,
+            bmpSrcW: 0,
+            bmpSrcH: 0,
+            bmpW0: 0,
+            bmpH0: 0,
             ; Bound function
-                fn : "",
-                fnParams : ""
-            },
-            2 : {
-            ; Unique setters
-                alpha : 0xFF,
-                color : 0,
-                filled : obj.filled,
-                penwidth : obj.penwidth,
-                visible : true
-            }
+            fn: "",
+            fnParams: ""
         }
     }
 
@@ -480,27 +883,27 @@ class Shape {
         local p := props
         switch obj.cls {
             case "Polygon", "FilledPolygon", "Triangle", "FilledTriangle", "Beziers", "Lines":
-                p.1.pPoints := 0
-                p.1.points := 0
+                p.pPoints := 0
+                p.points := 0
                 if !(obj.cls ~= "Beziers|Lines")
-                    p.1.fillmode := obj.fillmode
+                    p.fillmode := obj.fillmode
             case "Arc", "Pie", "FilledPie":
-                p.1.startangle := obj.startangle
-                p.1.sweepangle := obj.sweepangle
+                p.startangle := obj.startangle
+                p.sweepangle := obj.sweepangle
             case "Bezier":
-                p.1.x1 := obj.x1
-                p.1.y1 := obj.y1
-                p.1.x2 := obj.x2
-                p.1.y2 := obj.y2
-                p.1.x3 := obj.x3
-                p.1.y3 := obj.y3
-                p.1.x4 := obj.x4
-                p.1.y4 := obj.y4
+                p.x1 := obj.x1
+                p.y1 := obj.y1
+                p.x2 := obj.x2
+                p.y2 := obj.y2
+                p.x3 := obj.x3
+                p.y3 := obj.y3
+                p.x4 := obj.x4
+                p.y4 := obj.y4
             case "Line":
-                p.1.x1 := obj.x1
-                p.1.y1 := obj.y1
-                p.1.x2 := obj.x2
-                p.1.y2 := obj.y2
+                p.x1 := obj.x1
+                p.y1 := obj.y1
+                p.x2 := obj.x2
+                p.y2 := obj.y2
         }
         return
     }
@@ -511,13 +914,19 @@ class Shape {
         local shp := Shapes.%this.layerid%.%this.id%
         
         obj.cls := this.base.__Class
-        if (obj.HasOwnProp("Filled") && obj.filled) {
+        if (obj.filled == 1) {
             shp.Tool := SolidBrush(obj.colour)
             obj.cls := "Filled" obj.cls
         }
-        else if (obj.penwidth >= 1 && obj.penwidth <= 100) {
+        else if ((!obj.filled || obj.filled > 1) ) {
+            if (obj.filled == 0)
+                obj.penwidth := 1
+            else if (obj.filled > 1 && obj.penwidth <= 100) {
+                obj.penwidth := obj.filled
+            }
+            else
+                throw ValueError("[!] Invalid pen width value")
             shp.Tool := Pen(obj.colour, obj.penwidth)
-            obj.filled := 0
         }
         else {
             throw ValueError("[!] Invalid value during tool initialization")
@@ -527,18 +936,10 @@ class Shape {
 
     ; Set the base properties for the shape.
     setBaseProps(props) {
-        loop 2 {
-            i := A_Index
-            for name, value in props.%i%.OwnProps() {
-                getter := get_Shape.Bind(name)
-                switch i {
-                    case 1: setter := set_Shape.Bind(name)
-                    case 2: setter := this.%("set_" name)%
-                }
-                this.DefineProp(name, {get : getter, set : setter})
-                this.%name% := value
-            }
-        } 
+        for name, value in props.OwnProps() {
+            this.DefineProp(name, {get: get_Shape.Bind(name), set: set_Shape.Bind(name)})
+            this.%name% := value
+        }
     }
 
     ; Set the unique properties for the shape if needed.
@@ -604,8 +1005,8 @@ class Shape {
             throw ValueError("[?] The current active layer doesn't exist.")
 
         this.layerid := Layer.activeid
-        this.id := id := ++Shape.id
-
+        this.id := ++Shape.id
+        
         ; Some properties depend on others during initialization.
         this.setMissingProp(&obj)
         this.setReferenceObj(obj)
@@ -620,15 +1021,6 @@ class Shape {
         OutputDebug("[+] Shape " this.id " created on Layer " this.layerId "`n")  
     }
 
-    /**
-     * Removes `Prototype` and `__Init` methods for faster lookup
-     * in the Shapes.OwnProps() enumeration.
-     */
-    static __New() {
-        Shapes.DeleteProp("__Init")
-        Shapes.DeleteProp("Prototype")
-    }
-
     ; Release resources (font, tool, bitmap)
     __Delete() {
         if (Shapes.HasProp(this.LayerId) && Shapes.%this.LayerId%.HasProp(this.id)) {
@@ -636,6 +1028,15 @@ class Shape {
             Shapes.%this.Layerid%.DeleteProp(this.id)
             OutputDebug("[-] Shape " this.id " deleted from Layer " this.Layerid "`n") 
         }
+    }
+
+    /**
+     * Removes `Prototype` and `__Init` methods for faster lookup
+     * in the Shapes.OwnProps() enumeration.
+     */
+    static __New() {
+        Shapes.DeleteProp("__Init")
+        Shapes.DeleteProp("Prototype")
     }
 
     static __Delete() {
@@ -650,174 +1051,4 @@ class Shape {
             }
         }
     }
-
-    ;{ Property setters
-
-    set_PenWidth(value) {
-        if (value >= 1 && value <= 100) {
-            Shapes.%this.Layerid%.%this.id%.Tool.Width := value
-            return
-        }
-        throw ValueError("[!] Invalid value for PenWidth property")
-    }
-
-    set_Visible(value) {
-        if !(IsBool(value)) {
-            if (value !== -1 || value != "Toggle")
-                return
-            Shapes.%this.Layerid%.%this.id%.Visible ^= 1
-            return
-        }
-        Shapes.%this.Layerid%.%this.id%.Visible := value
-    }
-
-    set_Alpha(value) {
-        local obj, c
-        if (!isAlphaNum(value))
-            return
-        
-        ; Return if no change in alpha value
-        obj := Shapes.%this.Layerid%.%this.id%
-        if (obj.Alpha == value)
-            return
-
-        ; Set the new tool color and alpha value
-        if (obj.Tool.Type == 0 || obj.Tool.Type == 5) {
-            obj.Tool.Color := (obj.Color & 0x00FFFFFF) | (value << 24)
-        }
-        else if (obj.Tool.Type == 4) {
-            c :=  obj.Tool.Color
-            c[1] := (c[1] & 0x00FFFFFF) | (value << 24)
-            c[2] := (c[2] & 0x00FFFFFF) | (value << 24)
-            obj.Tool.Color := c
-        }
-        ; TODO: finish the implementation for the other tool types
-        
-        obj.Alpha := value
-    }
-
-    set_Color(value) {
-
-        local obj
-        
-        if (value && Type(value) == "Integer" || (Type(value) == "String")) {
-
-            obj := Shapes.%this.Layerid%.%this.id%
-            
-            value := Color(value)
-
-            ; Erase the current tool if the shape is not a brush or pen
-            if (!obj.Tool || obj.Tool.Type !== 0 && obj.Tool.Type !== 5) {
-                obj.Tool := ""
-                if (obj.Filled)
-                    obj.Tool := SolidBrush(value)
-                else
-                    obj.Tool := Pen(value, obj.PenWidth)
-            }
-    
-            ; Set the color
-            obj.Tool.Color := value
-            return
-        }
-        else if (Type(value) == "Array") {
-
-            obj := Shapes.%this.Layerid%.%this.id%
-
-            tooltype := obj.Tool.Type
-
-            ; The name not defined, default Linear Gradient Mode
-            if (value.Length == 2) {
-
-                value[1] := Color(value[1])
-                value[2] := Color(value[2])
-
-                ; It's gradient
-                if (tooltype == 4) {
-                    obj.Tool.color := [value[1], value[2]]
-                    return
-                }
-
-                value.InsertAt(1, "")
-                    tooltype := 4
-            }
-            else {
-                switch value[1], 0 {
-                    case "Gradient": tooltype := 4
-                    case "Hatch":    tooltype := 1
-                    case "Texture":  tooltype := 2
-                    default: throw ValueError("[!]")
-                }
-            }
-
-            ; Destroy the current tool.
-            obj.Tool := ""
-
-            switch tooltype {
-                case 1:
-                ; Hatch
-                    value[2] := Color(value[2])
-                    value[3] := Color(value[3])
-                    obj.Tool := HatchBrush(value[2], value[3], value[4])
-                case 2:
-                ; Texture
-                    obj.Tool := TextureBrush(value[2]
-                    , value.has(3) ? value[3] : 0
-                    , value.has(4) ? value[4] : 100)     ; TODO: implement fit to shape
-                case 3:
-                ; PathGradient (not implemented yet)
-                    return
-                ; Gradient
-                case 4:
-                    LinearGradientMode := (value.Has(4)) ? value[4] : 0
-                    WrapMode := (value.Has(5)) ? value[5] : 1
-                    RectF := Buffer(16)
-                    NumPut("float", this.x, RectF, 0)
-                    NumPut("float", this.y, RectF, 4)
-                    NumPut("float", this.w, RectF, 8)
-                    NumPut("float", this.h, RectF, 12)
-                    obj.tool := LinearGradientBrush(value[2], value[3]
-                        , LinearGradientMode, WrapMode, RectF.ptr)
-            }
-        }
-        return
-    }
-
-    /**
-    * Changes the tool between a pen and a brush based on the filled status.
-    * @param {bool} value indicating whether the shape should be filled or not.  
-     */
-    set_Filled(value) {
-        
-        local obj, tooltype
-        
-        if (!IsBool(value))
-            return
-
-        ; Get the shape reference
-        obj := Shapes.%this.Layerid%.%this.id%
-        if (obj.Filled == value) ; && (obj.Tool.Type == 0 || obj.Tool.Type == 5)
-            return
-
-        ; Save the current color and tool type before deleting the tool
-        tooltype := obj.Tool.Type
-        clr := obj.Tool.Color
-        obj.Tool := ""
-
-        ; It's a switchback from gradient to pen
-        if (Type(clr) == "Array") {
-            clr := Random(0xFF000000, 0xFFFFFFFF)
-        }
-
-        ; Change the shape tool type
-        if (tooltype == 5) {
-            obj.Tool := SolidBrush(clr)
-            this.Shape := "Filled" this.Shape
-        }
-        else if (tooltype == 0) {
-            obj.Tool := Pen(clr, 1)
-            this.Shape := SubStr(this.Shape, 7)
-        } else
-            return
-    }
-    ;}
 }

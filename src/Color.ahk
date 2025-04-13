@@ -2,17 +2,18 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * A class for color manipulation and generation.
  * @property ColorNames a list of color names
- * @Example
+ * @example
+ * ; The names are case insensitive.
  * c := Color()                     ; Random color
  * c := Color("Lime")               ; Color name by calling the color class
  * c := Color.Lime                  ; Direct access to value by name
- * c := Color("Red|Blue|Green")     ; Random color from the list
+ * c := Color("red|blue|green")     ; Random color from the list
  * c := Color("0xFF0000FF")         ; 0xARGB
  * c := Color("#FF0000FF")          ; #ARGB
  * c := Color("0x0000FF")           ; 0xRGB
@@ -24,7 +25,7 @@ class Color {
     /**
      * Returns a random color, accepts multiple types of color inputs.
      * @param {str} c color name, ARGB, or a list of color names separated by "|"
-     * @returns {int} ARGB
+     * @return {int} ARGB
      * 
      * @credit iseahound - Graphics, https://github.com/iseahound/Graphics  
      */
@@ -51,7 +52,7 @@ class Color {
      * Sets the alpha channel of a color.
      * @param ARGB a valid ARGB
      * @param {int} A alpha channel value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Alpha(ARGB, A := 255) {
         A := (A > 255 ? 255 : A < 0 ? 0 : A)
@@ -62,7 +63,7 @@ class Color {
      * Sets the alpha channel of a color in float format.
      * @param ARGB a valid ARGB
      * @param {float} A alpha channel value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static AlphaF(ARGB, A := 1.0) {
         A := (A > 1.0 ? 255 : A < 0.0 ? 0 : Ceil(A * 255))
@@ -73,13 +74,13 @@ class Color {
      * Swaps the color channels of an ARGB color.
      * @param colour 
      * @param {str} mode 
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static ChannelSwap(colour, mode := "Rand") {
         
         static modes := ["RGB", "RBG", "BGR", "BRG", "GRB", "GBR"]
         
-        local A, R, G, B
+        local A, R, G, B, i, channel
         local c := 0x0
 
         if (mode ~= "i)^R(and(om)?)?$") {
@@ -95,10 +96,10 @@ class Color {
         B :=  0x000000ff & colour
 
         for i, channel in StrSplit(mode) {
-            switch channel {
-                case "R","r": c := c | R << 8 * (3 - i)
-                case "G","g": c := c | G << 8 * (3 - i)
-                case "B","b": c := c | B << 8 * (3 - i)
+            switch channel, 0 {
+                case "R": c := c | R << 8 * (3 - i)
+                case "G": c := c | G << 8 * (3 - i)
+                case "B": c := c | B << 8 * (3 - i)
             }
         }
         return (A << 24) | c
@@ -109,7 +110,7 @@ class Color {
      * @param color1 starting color
      * @param color2 end color
      * @param backforth number of transitions * 100, 2 means back and forth (doubles the array size)
-     * @returns {array}
+     * @return {array}
      */
     static GetTransition(color1, color2, backforth := false) {
         
@@ -118,6 +119,7 @@ class Color {
         ; Validate.
         if (backforth !== 0 && backforth !== 1)
             throw ValueError("backforth must be bool")
+
         color1 := this.Call(color1)
         color2 := this.Call(color2)
 
@@ -142,7 +144,7 @@ class Color {
      * @param {int} color2 end ARGB
      * @param {int|float} dist distance between the colors
      * @param {int} alpha alpha channel
-     * @returns {array}
+     * @return {array}
      */
     static LinearInterpolation(color1, color2, dist, alpha := 255) {
         
@@ -156,7 +158,7 @@ class Color {
             p := dist * 100
         }
         else {
-            throw ValueError("Must be an integer or float")
+            throw ValueError("Distance must be an integer or float")
         }
 
         ; Get the R, G, B components of colors
@@ -172,8 +174,8 @@ class Color {
         B2 :=  0x000000ff & c2
         
         ; Calculate the new values
-        R := R1 + Ceil(p * (R2 - R1))
-        G := G1 + Ceil(p * (G2 - G1))
+        R := R1 + Ceil(p * (R2 - R1)),
+        G := G1 + Ceil(p * (G2 - G1)),
         B := B1 + Ceil(p * (B2 - B1))
 
         return (alpha << 24) | (R << 16) | (G << 8) | B
@@ -183,7 +185,7 @@ class Color {
      * Returns a random color, accepts multiple color names, and randomness.
      * @param {str} colorName single or multiple color names separated by "|"
      * @param {int} randomness adds a random factor to each channel
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Random(colorName := "", randomness := false) {
         
@@ -218,7 +220,7 @@ class Color {
      * Randomize a color with a given randomness.
      * @param {int} ARGB a valid ARGB
      * @param {int} rand the randomness value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Randomize(ARGB, rand := 15) {
 
@@ -226,8 +228,8 @@ class Color {
         local G := (0x0000ff00 & ARGB) >>  8
         local B :=  0x000000ff & ARGB
 
-        R := Min(255, Max(0, R + Random(-rand, rand)))
-        G := Min(255, Max(0, G + Random(-rand, rand)))
+        R := Min(255, Max(0, R + Random(-rand, rand))),
+        G := Min(255, Max(0, G + Random(-rand, rand))),
         B := Min(255, Max(0, B + Random(-rand, rand)))
 
         return 0xFF000000 | (R << 16) | (G << 8) | B
@@ -235,7 +237,7 @@ class Color {
 
     /**
      * Returns a random ARGB, also accessible as a function (RandomARGB).
-     * @returns {int} ARGB  
+     * @return {int} ARGB  
      */
     static RandomARGB() {
         return Random(0xFF000000, 0xFFFFFFFF)
@@ -245,7 +247,7 @@ class Color {
      * Returns a random color with a given alpha channel from a range.
      * @param {int} alpha alpha channel value or the range minimum
      * @param {int} max maximum range value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static RandomARGBAlphaMax(alpha := 0xFF, max := false) {
         if (alpha > 255 || alpha < 0 || max > 255 || max < 0)
@@ -261,7 +263,7 @@ class Color {
      * @param color2 end color
      * @param dist distance between the colors
      * @param alpha alpha channel
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Transition(color1, color2, dist := 1, alpha := 255) {
         if (Type(dist) == "Float")

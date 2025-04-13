@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * The Fps class provides a simple way to display the frames per second on the screen.
@@ -18,7 +18,7 @@ class Fps {
     static __New() {
         
         ; Hold the graphics object
-        this.id := 2**63 - 1 ; largest int in AHK
+        this.id := 2**63 - 1 ; largest integer in AutoHotkey
         this.Layer := 0
         this.Shape := 0
         
@@ -31,10 +31,6 @@ class Fps {
         this.lastrender := 0.0001
         this.totalrender := 0.0001
         this.rendertime := 0.0001
-
-        ; Target fps bounds
-        this.max := 99999
-        this.min := 0.001
         
         ; Positioning
         this.w := 200
@@ -58,10 +54,10 @@ class Fps {
             Layer.activeid := this.id
 
             ; Create layer and shape
-            this.Layer := Layer(, , this.w, this.h)
+            this.Layer := Layer(this.w, this.h)
             this.Shape := Rectangle(, , this.w, this.h, "black")
 
-            ; Can be overridden via Fps.pos := value
+            ; Can be overridden via Fps.Position()
             this.Position(this.pos)
 
             ; Set back id
@@ -70,7 +66,7 @@ class Fps {
 
         ; Update fps panel text, draw fps layer
         this.Update()
-        Draw(this.Layer) ; we cannot use this here
+        Draw(this.Layer)
 
         ; Add delay
         if (delay)
@@ -196,19 +192,11 @@ class Fps {
                 this.position(position)
         }
 
-        ; Hurting my eyes, needs a rework
-        if (!targetfps || targetfps ~= "i)Max(imum)?") {
-            this.target := Fps.max
+        if (!targetfps || targetfps ~= "i)max(imum)?") {
+            this.target := 2**32
         }
         else if (Type(targetfps) == "Integer") {
-            switch {
-                case targetfps <= this.max && targetfps >= this.min:
-                    this.target := targetfps
-                case targetfps > this.max:
-                    this.target := this.max
-                case targetfps < this.min:
-                    this.target := this.min
-            }
+            this.target := targetfps
         }
         else if (Type(targetfps) == "Float") {
             this.target := Integer(targetfps)
@@ -216,7 +204,10 @@ class Fps {
         else if (Type(targetfps) == "String") {
             try	this.target := Integer(targetfps)
             catch
-                throw ValueError "Invalid Fps target"
+                throw ValueError("Invalid Fps")
+        }
+        else {
+            throw TypeError("Invalid Fps")
         }
                 
         this.frametime := Round(1000 / this.target, 2)
@@ -225,14 +216,13 @@ class Fps {
     }
 
     /**
-     * Removes the fps panel. If persistent End() will remove it,
+     * Removes the fps panel. If the panel is persistent End() will remove it,
      * otherwise it will hang the process.
      */
     static __Delete() {
         if (Type(Fps.Layer) == "Layer") {
-            if (Fps.HasOwnProp("Remove")) {
+            if (Fps.HasOwnProp("Remove"))
                 this.Remove()
-            }
         }
     }
 }

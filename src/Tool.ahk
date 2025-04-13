@@ -2,25 +2,20 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * The `Pen` class represents a drawing pen used to draw lines and shapes.  
- * @property {ARGB} Color - Gets or sets the color of the pen.
- * @property {Int} Width - Gets or sets the width of the pen.
+ * @property {ARGB} color - Gets or sets the color of the pen.
+ * @property {int} width - Gets or sets the width of the pen.
  */
 class Pen {
 
     /**
      * @property Color Gets or sets the color of the pen.
-     * @get clr := this.Color
-     * @set {ARGB} this.Color := 0xFF000000
-     *   
-     * this.Color := 4249542579 {iARGB}  
-     * this.Color := "Gray"     {cName}
      */
-    color {
+    Color {
         get {
             local value
             return (DllCall("gdiplus\GdipGetPenColor", "ptr", this.ptr, "int*", &value:=0), value)
@@ -29,11 +24,9 @@ class Pen {
     }
 
     /**
-     * @property width - Gets or sets the width of the pen.
-     * @get penWidth := this.Width
-     * @set this.Width := 1
+     * @property Width Gets or sets the width of the pen.
      */
-    width {
+    Width {
         get {
             local value
             return (DllCall("gdiplus\GdipGetPenWidth", "ptr", this.ptr, "float*", &value:=0), value)
@@ -103,9 +96,7 @@ class Brush {
 class SolidBrush extends Brush {
 
     /**
-     * @property color gets or sets the color of the brush
-     * @get clr := this.Color
-     * @set this.Color := 0xFF000000
+     * @property color gets or sets the color of the SolidBrush
      */
     color {
         get {
@@ -138,7 +129,6 @@ class HatchBrush extends Brush {
     __New(foreARGB, backARGB, hatchStyle) {
         if (hatchStyle > 53 || hatchStyle < 0)
             hatchStyle := this.getStyle(hatchStyle)
-        this.color := [foreARGB, backARGB, hatchStyle]     
         DllCall("gdiplus\GdipCreateHatchBrush"
             ,  "int", hatchStyle      ; hatchStyle
             ,  "int", foreARGB        ; foreground ARGB
@@ -152,12 +142,12 @@ class HatchBrush extends Brush {
     ; Verify hatch style input.
     getStyle(value) {
         if (Type(value) == "String" && HatchBrush.styleName.HasProp(value))
-            return HatchBrush.StyleName.%value%
+            return HatchBrush.styleName.%value%
         throw ValueError("Invalid Hatch style")
     }
 
     ; Names in array.
-    static Style :=
+    static style :=
         [ "HatchStyleHorizontal"   , "Vertical"             , "ForwardDiagonal"      ; 0-3
         , "BackwardDiagonal"       , "Cross"                , "DiagonalCross"        ; 4-5
         , "05Percent"              , "10Percent"            , "20Percent"            ; 6-8
@@ -179,9 +169,9 @@ class HatchBrush extends Brush {
 
     ; Make accessible the style names as a dictionary.
     static __New() {          
-        this.StyleName := {}
-        for name in this.Style {
-            this.StyleName.%name% := A_Index - 1
+        this.styleName := {}
+        for name in this.style {
+            this.styleName.%name% := A_Index - 1
         }
     }
 }
@@ -275,7 +265,7 @@ class LinearGradientBrush extends Brush {
      * @param {int} pRectF 
      */
     __New(foreARGB, backARGB, gradMode := 1, wrapMode := 1, pRectF := 0) {
-        this.LinearGradientMode(&gradMode)
+        this.LinearGradientMode(&gradMode),
         DllCall("gdiplus\GdipCreateLineBrushFromRect"
             ,  "ptr", pRectF            ; pointer to rect structure 
             ,  "int", foreARGB          ; foreground ARGB
@@ -289,27 +279,16 @@ class LinearGradientBrush extends Brush {
     }
 
     /**
-     * Sets the colors of a LinearGradientBrush by a method call.
-     * @param foreARGB 
-     * @param backARGB 
-     */
-    Color(foreARGB, backARGB) {
-        DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", foreARGB, "int", backARGB)
-    }
-
-    /**
      * Gets or sets the colors of a LinearGradientBrush.
      * @get returns an array [color1, color2]
      * @set this.Color := [0xFF000000, 0xFFFFFFFF]
      */
     Color {
-
         get {
             local c1, c2
             return (DllCall("gdiplus\GdipGetLineColors", "ptr", this.ptr, "int*", &c1:=0, "int*", &c2:=0), [c1, c2])
         }
-
-        set =>  DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", value[1], "int", value[2])
+        set => DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", value[1], "int", value[2])
     } 
 }
 
