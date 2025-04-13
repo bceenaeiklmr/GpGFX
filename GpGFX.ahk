@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * Wanted to say thank you for everyone who contributes to the AHK community.
@@ -71,7 +71,6 @@ ExitFn(*) {
     OutputDebug("[i] GpGFX exiting...`n")
 }
 
-
 /**
  * Gdiplus class handles the initialization and shutdown of Gdiplus.
  */
@@ -91,10 +90,9 @@ class Gdip {
      *			throw Error('Gdiplus failed to load.')
      */
     static Startup() {
-        GdiplusVersion := 1
-        StartupInput := Buffer(32, 0) ; struct
-        Numput("int", GdiplusVersion, StartupInput)
-        DllCall("Gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", StartupInput, "ptr", 0)
+        gdipStartupInput := Buffer(32, 0)
+        Numput("int", gdipVersion:=1, gdipStartupInput)
+        DllCall("Gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", gdipStartupInput, "ptr", 0)
         if (!this.pToken := pToken) {
             throw Error("Gdiplus failed to start.")
         }
@@ -113,5 +111,5 @@ class Gdip {
     static Shutdown(*) {
         DllCall("gdiplus\GdiplusShutdown", "ptr", this.pToken)
         OutputDebug("[-] Gdiplus has shut down, token: " this.pToken "`n")
-    }	
+    }
 }
