@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * Wanted to say thank you for everyone who contributes to the AHK community.
@@ -19,7 +19,6 @@
  * Finally, Lexikos for creating and maintaining AutoHotkey v2.
  */
 
-; Users should include this file (GpGFX.ahk) in their scripts to use GpGFX.
 ; See the examples for further information.
 
 #Requires AutoHotkey v2
@@ -34,7 +33,7 @@ if (!DllCall("GetModuleHandle", "str", "Gdiplus.dll")) {
     ExitApp()
 }
 
-; Startup
+; Startup.
 Gdip.Startup()
 OnExit(ExitFn)
 SetWinDelay(0)
@@ -59,7 +58,6 @@ ExitFn(*) {
     OutputDebug("[i] GpGFX exiting...`n")
 }
 
-
 /**
  * Gdiplus class handles the initialization and shutdown of Gdiplus.
  */
@@ -79,10 +77,9 @@ class Gdip {
      *			throw Error('Gdiplus failed to load.')
      */
     static Startup() {
-        GdiplusVersion := 1
-        StartupInput := Buffer(32, 0) ; struct
-        Numput("int", GdiplusVersion, StartupInput)
-        DllCall("Gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", StartupInput, "ptr", 0)
+        gdipStartupInput := Buffer(32, 0)
+        Numput("int", gdipVersion:=1, gdipStartupInput)
+        DllCall("Gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", gdipStartupInput, "ptr", 0)
         if (!this.pToken := pToken) {
             throw Error("Gdiplus failed to start.")
         }
@@ -101,7 +98,7 @@ class Gdip {
     static Shutdown(*) {
         DllCall("gdiplus\GdiplusShutdown", "ptr", this.pToken)
         OutputDebug("[-] Gdiplus has shut down, token: " this.pToken "`n")
-    }	
+    }
 }
 
 
@@ -112,16 +109,12 @@ class Layers {
      */
 }
 
-/**
- * Getter and setter for the layer class and the layers data.
- * @param Name
- * @returns {property} 
- */
-get_Layer(Name, this) {
-    return Layers.%this.id%.%Name%
+; Getter and setter for the layer class and the layers data.
+get_Layer(name, this) {
+    return Layers.%this.id%.%name%
 }
-set_Layer(Name, this, value) {
-    Layers.%this.id%.%Name% := value 
+set_Layer(name, this, value) {
+    Layers.%this.id%.%name% := value 
 }
 
 /**
@@ -134,6 +127,289 @@ class Layer {
 
     ; Shape creation happens based on the active layer
     static activeid := 0
+
+    /**
+     * Set tha alpha (transparency) of the layer.
+     * @param {int} value 0-255
+     */
+    Alpha {
+        get => Layers.%this.id%.alpha
+        set => (value <= 255 && value >= 0) ? Layers.%this.id%.alpha := value : 0
+    }
+
+    /**
+     * Sets the shape rendering quality of the layer.
+     * @param {str} value fast or low, balanced or normal, high or quality
+     */
+    Quality {
+        get => Layers.%this.id%.quality
+        set => (value == "i)^(fast|low|balanced|normal|quality|high)$") ? Layers.%this.id%.quality := value : 0
+    }
+
+    /**
+     * Sets the update frequency of the layer (draws, not ms).
+     * @param {int} value
+     */
+    UpdateFreq {
+        get => Layers.%this.id%.updatefreq
+        set => (value >= 0) ? Layers.%this.id%.updatefreq := value : 0
+    }
+
+    /**
+     * Enables overdraw the Graphics.
+     * @param {bool} true for overdraw; default false (deletes graphics)
+     */
+    Redraw {
+        get => Layers.%this.id%.redraw
+        set => (IsBool(value)) ? Layers.%this.id%.redraw := value : 0
+    }
+
+    /**
+     * Sets the visibility of the layer. Hidden layers will be skipped during draw.
+     * @param {bool} value true or false
+     */
+    Visible {
+        get => Layers.%this.id%.visible
+        set => (IsBool(value)) ? Layers.%this.id%.visible := value : 0
+    }
+
+    ;{ Visibility methods
+
+    /**
+     * Visibility and accessiblity methods for the layer.  
+     * In some cases Clickthrough, AlwaysOnTop, TopMost can be useful.  
+     * Hide, Show, ShowHide effects the layer, you can avoid a Draw call this way.  
+     * @credit iseahound - TextRender v1.9.3
+     * https://github.com/iseahound/TextRender
+     */
+
+    Show() {
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", SW_NOACTIVATE:=4)
+        this.visible := 1
+    }
+
+    Hide() {
+        DllCall("ShowWindow", "ptr", this.hwnd, "int", SW_HIDE:=0)
+        this.visible := 0
+    }
+
+    ShowHide() {
+        (this.visible) ? this.Hide() : this.Show()
+    }
+
+    AlwaysOnTop() {
+        WinSetAlwaysOnTop(-1, this.hwnd)
+    }
+
+    Clickthrough(v) {
+        WinSetExStyle((v) ? +0x20 : -0x20, this.hwnd)
+    }
+
+    NoActivate() {
+        WinSetExStyle(0x8000000, this.hwnd)
+    }
+
+    TopMost() {
+        WinSetAlwaysOnTop(1, this.hwnd)
+    }
+
+    /**
+     * Debug a layer by drawing rectangles around the DIB and used area.
+     * @param {int} time elapsed time in seconds before the layer is deleted
+     * @param {int} filled filled or not filled rectangles
+     * @param {int} alpha transparency of the rectangles
+     */
+    Debug(time := 1, filled := 0, alpha := 0x60) {
+        
+        local rect1, rect2, lyr
+        
+        ; Prepare the layer for drawing. (bounds)
+        Layer.Prepare(this.id)
+        
+        ; Create a temporary objects.
+        lyr := Layer(this.x, this.y, this.w, this.h)
+       
+        ; Create shapes, with indicator text.
+        rect1 := Rectangle(0, 0, this.w, this.h, "blue")
+        rect2 := Rectangle(this.x1, this.y1, this.width, this.height, "red", filled)
+        rect1.Text("Layer DIB size", "black", 42)
+        rect2.Text("Layer used size", "black", 21)
+        rect1.alpha := alpha
+        rect2.alpha := alpha
+
+        ; Display.
+        lyr.Draw()
+        Sleep(time * 1000)
+        return
+    }
+
+    /**
+     * Centers the layer on the screen.
+     * @returns {Layer} Center and Resize methods can be chained
+     */
+    Center() {
+        this.x := (A_ScreenWidth  - this.w) // 2
+        this.y := (A_ScreenHeight - this.h) // 2
+        WinMove(this.x, this.y, , , this.hwnd)
+        return this
+    }
+
+    /**
+     * Moves the layer to the specified position.
+     * @param x coordinate
+     * @param y coordinate
+     * @returns {Layer} Move and Resize methods can be chained
+     */
+    Move(x?, y?) {
+        if (IsSet(x))
+            this.x := x
+        if (IsSet(y))
+            this.y := y
+        WinMove(x?, y?, , , this.hwnd)
+        return this
+    }
+
+    /**
+     * Resizes the layer and its Graphics object.
+     * @param w width
+     * @param h height
+     * @returns {Layer} Resize and center can be chained
+     */
+    Resize(w, h) {
+        Graphics.%this.id% := ""
+        Graphics.%this.id% := Graphics(w, h)
+        this.w := w
+        this.h := h
+        Layer.Prepare(this.id)
+        return this
+    }
+
+    /**
+     * Sets the layer position to the monitor.  
+     * Currently only supports the primary monitor, broken.
+     * @param {int} disp monitor number.
+     */
+    setMonitor(disp := 1) {
+        local x1, mon
+
+        mon := MonitorGetCount()
+        if (disp > mon || disp < 1)
+            return
+
+        MonitorGetWorkArea(disp, &x1)
+        this.x := x1
+        this.y := 0
+        return
+    }
+
+    ; Save the position of the layer to an array or object.
+    SavePos(arr := false) {
+        return (arr) ? [this.x, this.y, this.w, this.h]
+            : {x : this.x, y : this.y, w : this.w, h : this.h}
+    }
+
+    ; Restores the position of the layer from an array or object.
+    RestorePos(obj) {
+        if (Type(obj) == "Array" && obj.Length == 4) {
+            this.x := obj[1], this.y := obj[2]
+            this.w := obj[3], this.h := obj[4]
+            return
+        }
+        (obj.HasOwnProp("x")) ? this.x := obj.x : 0
+        (obj.HasOwnProp("y")) ? this.y := obj.y : 0
+        (obj.HasOwnProp("w")) ? this.w := obj.w : 0
+        (obj.HasOwnProp("h")) ? this.h := obj.h : 0
+        return
+    }
+    ;}
+
+    /**
+     * Export the layer to PNG.
+     * @credit iseahound - ImagePut v1.11
+     * https://github.com/iseahound/ImagePut
+     */
+    toFile(filepath) {
+        local pBitmap, pCodec
+        DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", Graphics.%this.id%.hbm, "ptr", 0, "ptr*", &pBitmap:=0)
+        pCodec := Buffer(16)
+        ; Get the CLSID of the PNG codec.
+        DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
+        DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
+    }
+
+    /**
+     * Clears the layer by setting the alpha to zero.
+     * @credit iseahound - Textrender v1.9.3, UpdateLayeredWindow
+     * https://github.com/iseahound/TextRender
+     */
+    Clean() {
+        DllCall("UpdateLayeredWindow"
+            ,    "ptr", this.hWnd                ; hWnd
+            ,    "ptr", 0                        ; hdcDst
+            ,    "ptr", 0                        ; *pptDst
+            ,    "ptr", 0                        ; *psize
+            ,    "ptr", 0                        ; hdcSrc
+            ,    "ptr", 0                        ; *pptSrc
+            ,   "uint", 0                        ; crKey
+            ,  "uint*", 0 << 16 | 0x01 << 24     ; *pblend
+            ,   "uint", 2                        ; dwFlags
+            ,    "int")                          ; Success = 1
+    }
+
+    GraphicsQuality(shapeForm) {
+
+        static setting := 0
+
+        gfx := Graphics.%this.id%.gfx
+
+        switch shapeForm {
+
+            case "Rectangle":
+                if (setting == 320)
+                    return
+                setting := 320
+                ; Balanced settings for sharp-edged shapes
+                DllCall('gdiplus\GdipSetSmoothingMode', 'ptr', gfx, 'int', 3)
+                DllCall('gdiplus\GdipSetPixelOffsetMode', 'ptr', gfx, 'int', 2)
+                DllCall('gdiplus\GdipSetInterpolationMode', 'ptr', gfx, 'int', 0)
+
+            case "Curved":
+                switch this.quality {
+                    case "fast", "low":
+                        if (setting == 320)
+                            return
+                        setting := 320
+                        ; Fast settings for curved shapes
+                        DllCall('gdiplus\GdipSetSmoothingMode', 'ptr', gfx, 'int', 3)
+                        DllCall('gdiplus\GdipSetPixelOffsetMode', 'ptr', gfx, 'int', 2)
+                        DllCall('gdiplus\GdipSetInterpolationMode', 'ptr', gfx, 'int', 0)
+
+                    case "balanced", "normal":
+                        if (setting == 224)
+                            return
+                        setting := 224
+                        ; Balanced settings for curved shapes
+                        DllCall('gdiplus\GdipSetSmoothingMode', 'ptr', gfx, 'int', 2)
+                        DllCall('gdiplus\GdipSetPixelOffsetMode', 'ptr', gfx, 'int', 2)
+                        DllCall('gdiplus\GdipSetInterpolationMode', 'ptr', gfx, 'int', 4)
+
+                    case "high", "quality":
+                        if (setting == 447)
+                            return
+                        setting := 447
+                        ; High-quality settings for curved shapes
+                        DllCall('gdiplus\GdipSetSmoothingMode', 'ptr', gfx, 'int', 4)
+                        DllCall('gdiplus\GdipSetPixelOffsetMode', 'ptr', gfx, 'int', 4)
+                        DllCall('gdiplus\GdipSetInterpolationMode', 'ptr', gfx, 'int', 7)
+                }
+        }
+    }
+
+    setReferenceObj() {
+        Layers.%this.id% := {id: this.id
+            , alpha: 0xFF, redraw: false
+            , visible: true, quality : "balanced", updatefreq: 0}
+    }
 
     ; Prepares the layer for drawing
     static Prepare(id) {
@@ -170,7 +446,6 @@ class Layer {
             (v.x + v.w > x2) ? x2 := v.x + v.w : 0
             (v.y + v.h > y2) ? y2 := v.y + v.h : 0
 
-            ; TODO: measure again the differences, remove pipe with a fixed length id
             str .= v.id "|"
         }
 
@@ -193,210 +468,8 @@ class Layer {
         Layers.%id%.x2 := x2 
         Layers.%id%.y2 := y2
 
-        ;this.prepared := SubStr(str, 1, -1)
         return SubStr(str, 1, -1)
     }
-
-    /**
-     * Resizes the layer and its Graphics object.
-     * @param w width
-     * @param h height
-     * @returns {Layer} Resize and center can be chained
-     */
-    Resize(w, h) {
-        Graphics.%this.id% := ""
-        Graphics.%this.id% := Graphics(w, h)
-        this.w := w
-        this.h := h
-        Layer.Prepare(this.id)
-        return this
-    }
-
-    /**
-     * Moves the layer to the specified position.
-     * @param x coordinate
-     * @param y coordinate
-     * @returns {Layer} Move and Resize methods can be chained
-     */
-    Move(x?, y?) {
-        if (IsSet(x))
-            this.x := x
-        if (IsSet(y))
-            this.y := y
-        WinMove(x?, y?, , , this.hwnd)
-        return this
-    }
-
-    /**
-     * Centers the layer on the screen.
-     * @returns {Layer} Center and Resize methods can be chained
-     */
-    Center() {
-        this.x := (A_ScreenWidth  - this.w) // 2
-        this.y := (A_ScreenHeight - this.h) // 2
-        WinMove(this.x, this.y, , , this.hwnd)
-        return this
-    }
-
-    /**
-     * Sets the layer position to the monitor.  
-     * Currently only supports the primary monitor, broken.
-     * @param {int} disp monitor number.
-     */
-    setMonitor(disp := 1) {
-        local x1, mon
-
-        mon := MonitorGetCount()
-        if (disp > mon || disp < 1)
-            return
-
-        MonitorGetWorkArea(disp, &x1)
-        this.x := x1
-        this.y := 0
-        return
-    }
-
-    /**
-     * Debug a layer by drawing rectangles around the DIB and used area.
-     * @param {int} time elapsed time in seconds before the layer is deleted
-     * @param {int} filled filled or not filled rectangles
-     * @param {int} alpha transparency of the rectangles
-     */
-    Debug(time := 1, filled := 0, alpha := 0x60) {
-        
-        local rect1, rect2, lyr
-        
-        ; Prepare the layer for drawing. (bounds)
-        Layer.Prepare(this.id)
-        
-        ; Create a temporary objects.
-        lyr := Layer(this.x, this.y, this.w, this.h)
-       
-        ; Create shapes, with indicator text.
-        rect1 := Rectangle(0, 0, this.w, this.h, "blue")
-        rect2 := Rectangle(this.x1, this.y1, this.width, this.height, "red", filled)
-        rect1.Text("Layer DIB size", "black", 42)
-        rect2.Text("Layer used size", "black", 21)
-        rect1.alpha := alpha
-        rect2.alpha := alpha
-
-        ; Display.
-        lyr.Draw()
-        Sleep(time * 1000)
-        return
-    }
-
-    /**
-     * Visibility and accessiblity methods for the layer.  
-     * In some cases Clickthrough, AlwaysOnTop, TopMost can be useful.  
-     * Hide, Show, ShowHide effects the layer, you can avoid draw this way.  
-     * @credit iseahound - TextRender v1.9.3
-     * https://github.com/iseahound/TextRender
-     */
-
-    Show() {
-        DllCall("ShowWindow", "ptr", this.hwnd, "int", 4)     ; NA - No Activate
-        this.visible := 1
-    }
-
-    Hide() {
-        DllCall("ShowWindow", "ptr", this.hwnd, "int", 0)     ; SW_HIDE - Hide
-        this.visible := 0
-    }
-
-    ShowHide() {
-        (this.visible) ? this.Hide() : this.Show()
-    }
-
-    Clickthrough(v) {
-        WinSetExStyle((v) ? +0x20 : -0x20, this.hWnd)
-    }
-
-    TopMost() {
-        WinSetAlwaysOnTop(1, this.hwnd)
-    }
-
-    NoActivate() {
-        WinSetExStyle(0x8000000, this.hwnd)
-    }
-
-    AlwaysOnTop() {
-        WinSetAlwaysOnTop(-1, this.hwnd)
-    }
-
-    /**
-     * Export the layer to PNG.
-     * @credit iseahound - ImagePut v1.11
-     * https://github.com/iseahound/ImagePut
-     */
-    toFile(filepath) {
-        local pBitmap, pCodec
-        DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", Graphics.%this.id%.hbm, "ptr", 0, "ptr*", &pBitmap:=0)
-	    pCodec := Buffer(16)
-        ; Get the CLSID of the PNG codec.
-	    DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
-	    DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
-    }
-
-    ; Save the position of the layer to an array or object.
-    SavePos(arr := false) {
-        return (arr) ? [this.x, this.y, this.w, this.h]
-            : {x : this.x, y : this.y, w : this.w, h : this.h}
-    }
-
-    ; Restores the position of the layer from an array or object.
-    RestorePos(obj) {
-        if (Type(obj) == "Array" && obj.Length == 4) {
-            this.x := obj[1], this.y := obj[2]
-            this.w := obj[3], this.h := obj[4]
-            return
-        }
-        (obj.HasOwnProp("x")) ? this.x := obj.x : 0
-        (obj.HasOwnProp("y")) ? this.y := obj.y : 0
-        (obj.HasOwnProp("w")) ? this.w := obj.w : 0
-        (obj.HasOwnProp("h")) ? this.h := obj.h : 0
-        return
-    }
-
-    /**
-     * Clears the layer by setting the alpha to zero.
-     * @credit iseahound - Textrender v1.9.3, UpdateLayeredWindow
-     * https://github.com/iseahound/TextRender
-     */
-    Clean() {
-        DllCall("UpdateLayeredWindow"
-            ,    "ptr", this.hWnd                ; hWnd
-            ,    "ptr", 0                        ; hdcDst
-            ,    "ptr", 0                        ; *pptDst
-            ,    "ptr", 0                        ; *psize
-            ,    "ptr", 0                        ; hdcSrc
-            ,    "ptr", 0                        ; *pptSrc
-            ,   "uint", 0                        ; crKey
-            ,  "uint*", 0 << 16 | 0x01 << 24     ; *pblend
-            ,   "uint", 2                        ; dwFlags
-            ,    "int")                          ; Success = 1
-    }
-
-    ;{ Property setters
-
-    ; Hidden layers will be skipped during the drawing.
-    set_Visible(value) {
-        if (IsBool(value))
-            Layers.%this.id%.Visible := value
-    }
-
-    ; Enables overdraw the Graphics.
-    set_Redraw(value) {
-        if (IsBool(value))
-            Layers.%this.id%.Redraw := value
-    }
-
-    ; Sets the update frequency of the layer (draws, not ms).
-    set_Alpha(value) {
-        if (value <= 255 && value >= 0)
-            Layers.%this.id%.Alpha := value
-    }
-    ;}
 
     /**
      * Layers class contains the layers objects data.  
@@ -419,7 +492,7 @@ class Layer {
      */
     __New(x?, y?, w?, h?, name := "", hParent := 0) {
 
-        local win, hwnd, props, getter, setter
+        local win, hwnd, prop, props, value
 
         ; Width, height provided as x and y, auto-center.
         if (IsSet(x) && IsSet(y) && !IsSet(w) && !IsSet(h)) {
@@ -442,8 +515,8 @@ class Layer {
         ; Set the layer active id, create object to layer and shape.
         this.id := ++Layer.id
         Layer.activeid := this.id
-        Layers.%this.id% := {id: this.id}
         Shapes.%this.id% := {}
+        this.setReferenceObj()
 
         ; Debugging purpose.
         this.name := (name == "") ? "layer" this.id : name 
@@ -457,7 +530,6 @@ class Layer {
         * WS_EX_TOOLWINDOW  0x80        hide taskbar
         * 
         * @credit iseahound - TextRender v1.9.3, CreateWindow
-        * https://github.com/iseahound/TextRender
         */
         static style := 0x80000000, styleEx := 0x80088
 
@@ -479,48 +551,31 @@ class Layer {
             x2: 0, y2: 0,
             width : 0, height : 0,
             hwnd : hwnd,
-            updatefreq : 0,
-            alpha : [0xFF],
-            redraw : [false],
-            visible : [true],
-            fontquality : 0,
-            name : name          ; dbg
+            name : name
         }
 
         ; Set the properties, array holds unique setters.
-        for name, value in props.OwnProps() {
-            if (Type(value) == "Array") {
-                if (value.Length == 2) {
-                    getter := this.%("get_" value[2])%
-                } else {
-                    getter := get_Layer.Bind(name)
-                }
-                setter := this.%("set_" name)%
-                value := value[1]
-            }
-            else {
-                setter := set_Layer.Bind(name)
-                getter := get_Layer.Bind(name)
-            }
-            this.DefineProp(name, {get : getter, set : setter})
-            this.%name% := value
+        for prop, value in props.OwnProps() {
+            this.DefineProp(prop, {get : get_Layer.Bind(prop), set : set_Layer.Bind(prop)})
+            this.%prop% := value
         }
 
         ; Bind Draw to this instance.
         this.Draw := Draw.Bind()
+        Layers.%this.id%.GraphicsQuality := this.GraphicsQuality
 
         OutputDebug("[+] Layer " this.id " created`n")
     }
 
     ; Deletes an instance.
     __Delete() {
-        
         local id := 0
         local k
         
+        ; Layer may not exist.
         if (Layers.HasProp(this.id) && WinExist(Layers.%this.id%.hWnd)) {
            
-            ; Delete the shapes and graphics.
+            ; Delete the graphics, and shapes.
             Graphics.DeleteProp(this.id)
             Shapes.DeleteProp(this.id)
             DllCall("DestroyWindow", "ptr", Layers.%this.id%.hWnd)
@@ -530,7 +585,7 @@ class Layer {
             ; new shapes spawn on the correct layer.
             for k in Layers.OwnProps() {
                 if (k !== this.id) && (k !== Fps.id)
-                        id := k
+                    id := k
             }
             ; Delete and set back id.
             Layers.DeleteProp(this.id)
@@ -542,20 +597,16 @@ class Layer {
 
     ; Delete layers and shapes.
     static __Delete() {
-        
-        local n := 0
-        local k, v
-        
-        for k, v in Layers.OwnProps() {
-            if (Layers.%k%.HasProp("hwnd")) {
-                Graphics.DeleteProp(k)
-                Shapes.DeleteProp(k)
-                DllCall("DestroyWindow", "ptr", Layers.%k%.hwnd)
-                Layers.DeleteProp(k)
-                n += 1
+        local id
+        for id in Layers.OwnProps() {
+            if (Layers.%id%.HasProp("hwnd")) {
+                Graphics.DeleteProp(id)
+                Shapes.DeleteProp(id)
+                DllCall("DestroyWindow", "ptr", Layers.%id%.hwnd)
+                Layers.DeleteProp(id)
+                OutputDebug("[-] All layers deletion, deleted: " id "`n")
             }
         }
-        (n) ? OutputDebug("[-] All layers deletion, deleted: " n "`n") : ""
     }
 }
 
@@ -656,6 +707,289 @@ CreateGraphicsObject(row := 3, col := 3, x?, y?, w := 0, h := 0, pad := 25, colo
  */
 class Shape {
 
+    ; Default values for the shape.
+    static alpha := 0xFF
+    static visible := true
+
+    ;{ Properties
+    /**
+     * Sets the alpha value of the shape modifying the tool alpha channel.
+     * @property {int} alpha
+     * @example
+     * this.alpha := 0xFF ; 255 (max, opaque)
+     * this.alpha := 0x0  ; 0   (min, transparent)
+     */
+    Alpha {
+
+        get => Shapes.%this.layerid%.%this.id%.alpha
+
+        set {
+            
+            local obj, clr
+            
+            if (!isAlphaValue(value)) {
+                throw ValueError("[!] Accepted type: integer.")
+            }
+
+            ; Return if no change in alpha value
+            obj := Shapes.%this.Layerid%.%this.id%
+            if (obj.alpha == value)
+                return
+
+            ; Set the new tool color and alpha value
+            if (obj.Tool.type == 0 || obj.Tool.type == 5) {
+                obj.Tool.color := (obj.color & 0x00FFFFFF) | (value << 24)
+            }
+            else if (obj.Tool.type == 4) {
+                clr :=  obj.Tool.color
+                clr[1] := (clr[1] & 0x00FFFFFF) | (value << 24)
+                clr[2] := (clr[2] & 0x00FFFFFF) | (value << 24)
+                obj.Tool.color := clr
+            }
+            else {
+                throw ValueError("[!] Only Pen, SolidBrush," .
+                    "and LinearGradientBrush supported.")
+            }
+
+            obj.alpha := value
+        }
+    }
+
+    /**
+     * @property {int|str} Color
+     * @example
+     * ; Solid Brush, Pen:
+     * this.Color := ""                   ; Random color
+     * this.Color := "Lime"               ; Color name by calling the color class
+     * this.Color := Color.Lime           ; Direct access to value by name
+     * this.Color := "red|blue|green"     ; Random color from multiple names
+     * this.Color := "0xFF0000FF"         ; 0xARGB
+     * this.Color := "#FF0000FF"          ; #ARGB
+     * this.Color := "0x0000FF"           ; 0xRGB
+     * this.Color := "#0000FF"            ; #RGB
+     * this.Color := 0xFF000000           ; Hex
+     * 
+     * ; Linear Gradient: [["Gradient"], foreARGB, backARGB, [GradientMode]]
+     * ; Horizontal = 0, Vertical = 1, ForwardDiagonal = 2, BackwardDiagonal = 3
+     * this.Color := ["Gradient", "Red", "Blue"]
+     * this.Color := ["Red", "Blue"] ; Gradient keyword can be omitted
+     * this.Color := ["Gradient", "Red", "Blue", 1] ; Vertical gradient
+     * this.Color := ["Gradient", "Red", "Blue", "ForwardDiagona"]
+     * 
+     * ; Hatch: ["Hatch", foreARGB, backARGB, hatchStyle]
+     * ; Hatch keyword must be defined.
+     * ; See tools HatchBrush for more details.
+     * this.Color := ["Hatch", "Red", "Blue", 42]
+     * 
+     * ; Texture: ["Texture", pBitmap, wrapmode, resize, x, y, w, h]
+     * ; Texture keyword must be defined.
+     * ; pBitmap accepts a Bitmap object or a valid bitmap pointer or a path to an existing image file.
+     * ; wrapmode how the brush is tiled (0 = Tile, 1 = Clamp)
+     * this.Color := ["Texture", filePath, 0, 100, 0, 0, 100, 100] ; from file
+     * this.Color := ["Texture", pBitmap, 0, 200, 0, 0, 100, 100] ; pointer to a Bitmap
+     * this.Color := ["Texture", BitmapInstance, 0, 33] ; pointer to a Bitmap
+     */
+    Color {
+
+        get => Shapes.%this.layerid%.%this.id%.Tool.color
+
+        set {
+
+            local obj
+
+            ; SolidBrush, Pen
+            if (value && Type(value) == "Integer" || (Type(value) == "String")) {
+
+                obj := Shapes.%this.Layerid%.%this.id%
+                value := Color(value)
+
+                ; Dispose the current tool if not brush or pen
+                if (!obj.Tool || obj.Tool.Type !== 0 && obj.Tool.Type !== 5) {
+                    obj.Tool := ""
+                    obj.Tool := (obj.Filled) ? SolidBrush(value) : Pen(value, obj.penwidth)
+                }
+
+                ; Set the color
+                obj.Tool.Color := value
+                return
+            }
+            ; GradientBrush, HatchBrush, TextureBrush
+            else if (Type(value) == "Array") {
+
+                obj := Shapes.%this.layerid%.%this.id%
+                tooltype := obj.Tool.Type
+
+                ; Append "Filled" to the shape as a prefix.
+                if (!obj.filled)
+                    this.shape := "Filled" this.shape
+
+                ; The name not defined, default Linear Gradient Mode
+                if (value.Length == 2) {
+
+                    if (value[1] ~= "i)^(texture|hatch|gradient)$") {
+                        throw ValueError("[!] Invalid color type")
+                    }
+
+                    ; Validate color values.
+                    value[1] := Color(value[1])
+                    value[2] := Color(value[2])
+
+                    ; It's already gradient, simply set LinearGradientBrush's color property.
+                    if (tooltype == 4) {
+                        obj.Tool.color := [value[1], value[2]]
+                        return
+                    }
+
+                    ; Set LinearGradient mode
+                    value.InsertAt(1, "")
+                    tooltype := 4
+                }
+                else {
+                    switch value[1], 0 {
+                        case "hatch": tooltype := 1
+                        case "texture": tooltype := 2
+                        case "gradient": tooltype := 4
+                        default: throw ValueError
+                    }
+                }
+
+                ; Dispose the current tool, and create the new one
+                obj.Tool := ""
+
+                switch tooltype {
+                    case 1:
+                        obj.Tool := HatchBrush(Color(value[2]), Color(value[3]), value[4])
+                    case 2:
+                        obj.Tool := TextureBrush(value[2],
+                            value.has(3) ? value[3] : 0,
+                            value.has(4) ? value[4] : 100)     ; TODO: implement fit to shape
+                    case 3:
+                        return
+                    case 4:
+                        rectF := Buffer(16),
+                        NumPut("float", this.x, rectF, 0),
+                        NumPut("float", this.y, rectF, 4),
+                        NumPut("float", this.w, rectF, 8),
+                        NumPut("float", this.h, rectF, 12),
+                        obj.tool := LinearGradientBrush(color(value[2]), color(value[3])
+                            , (value.Has(4)) ? value[4] : 0 ; LinearGradientMode
+                            , 1 ; WrapMode
+                            , rectF.ptr)
+                }
+            }
+            return
+        }
+    }
+
+    /**
+     * Changes the tool between a pen and a brush based on the filled status.
+     * @param {bool} value indicating whether the shape should be filled or not.  
+     */
+    Filled {
+
+        get => Shapes.%this.layerid%.%this.id%.filled
+
+        set {
+
+            local obj, tooltype 
+        
+            if (!IsBool(value))
+                return
+
+            ; Get the shape reference
+            obj := Shapes.%this.layerid%.%this.id%
+            if ((obj.Tool.type == 0 || obj.Tool.type == 5) && obj.filled == value)
+                return
+
+            ; Save the current color and tool type before deleting the tool
+            tooltype := obj.Tool.type
+            if (obj.Tool.HasOwnProp("color"))
+                clr := obj.Tool.color
+            else
+                clr := Random(0xFF000000, 0xFFFFFFFF)
+            obj.Tool := ""
+
+            ; It's a switchback from gradient to pen
+            if (Type(clr) == "Array") {
+                clr := clr[1]
+            }
+
+            ; Change the shape tool type
+            if (value) {
+                ; Append filled to the shape form
+                this.shape := "Filled" this.shape
+                obj.Tool := SolidBrush(clr)
+            }
+            else {
+                ; Remove filled from the shape form
+                this.shape := SubStr(this.shape, 7)
+                obj.Tool := Pen(clr, obj.penwidth)
+            }
+            
+            obj.filled := value
+        }
+
+    }
+
+    /**
+     * Sets the pen width of the shape.
+     * @param {int} value - width of the pen in pixels
+     */
+    PenWidth {
+        
+        get => Shapes.%this.layerid%.%this.id%.penwidth
+
+        set {
+            if (value >= 1 && value <= 100) {
+                local obj := Shapes.%this.layerid%.%this.id%
+                if (obj.Tool.type == 5)
+                    obj.Tool.width := value
+                obj.penwidth := value
+                return
+            }
+            throw ValueError("[!] Invalid value for PenWidth property")
+        }
+    }
+
+    /**
+     * Sets the visibility of the shape.  
+     * @param {bool} value - The visibility state of the shape.
+     */
+    Visible {
+
+        get => Shapes.%this.layerid%.%this.id%.visible
+
+        set {
+            if !(IsBool(value) || (value !== -1 || value != "toggle")) {
+                return
+            }
+            Shapes.%this.layerid%.%this.id%.visible ^= 1
+            return
+        }
+    }
+
+    ; Read only properties.
+    ImageWidth {
+        get => Shapes.%this.layerid%.%this.id%.Bitmap.w
+    }
+
+    ImageHeight {
+        get => Shapes.%this.layerid%.%this.id%.Bitmap.h
+    }
+
+    LayerWidth {
+        get => Layers.%this.layerid%.w
+    }
+
+    LayerHeight {
+        get => Layers.%this.layerid%.h
+    }
+
+    ToolType {
+        get => Shapes.%this.layerid%.%this.id%.Tool.type
+    }
+    ;}
+
     /**
      * Allows to insert of text onto the shape.  
      * @param {str} str text
@@ -667,7 +1001,9 @@ class Shape {
      */
     Text(str?, colour?, size?, family?, style?, quality?) {
         
-        local obj := Shapes.%this.Layerid%.%this.id%
+        local obj
+        
+        obj := Shapes.%this.Layerid%.%this.id%
 
         ; String.
         if (IsSet(str))
@@ -677,42 +1013,46 @@ class Shape {
         if (IsSet(colour))
             colour := Color(colour)
         else
-            colour := Font.default.colour
+            colour := obj.Font.color
 
         ; Size.
         if (IsSet(size)) {
             if (size < 1)
                 throw ValueError("[!] Invalid font size")
-        }  
-        else
-            size := Font.default.size
+        } else
+            size := obj.Font.size
 
         ; Family.
-        if (IsSet(family) && family ~= "^\d+$")
+        if (IsSet(family) && family ~= "^\d+$") 
             throw ValueError("[!] Invalid font family")
         else if (!IsSet(family))
-            family := Font.default.family
+            family := obj.Font.family
 
         ; Style.
-        if (IsSet(style) && !Font.style.HasOwnProp(style))
-            throw ValueError("[!] Invalid font style")
-        else if (!IsSet(style))
-            style := Font.default.style
-
+        if (IsSet(style)) {
+            if (!Font.style.HasOwnProp(style))
+                throw ValueError("[!] Invalid font style")
+            style := Font.style.%style%
+        }
+        else {
+            style := Font.Style.%(obj.Font.style)%
+        }
+            
         ; Quality.
         if (IsSet(quality)) {
             if (quality < 0 || quality > 4)
                 throw ValueError("[!] Invalid rendering quality value")
+            if (this.strQ != quality) {
+                this.strQ := quality
+            }
         }
-        else if (!IsSet(quality))
-            quality := Font.quality
-        this.quality := quality
+        quality := this.strQ
 
         ; Get a new or an existing font
         if (obj.Font.id !== (family "|" size "|" style "|" colour)) {
             if (obj.Font.id !== Font.stockid)
                 Font.RemoveAccess(obj.Font.id)
-            obj.Font := Font(family, size, style, colour)
+            obj.Font := Font(family, size, style, colour, quality)
         }
         return
     }
@@ -772,8 +1112,7 @@ class Shape {
         return
     }
 
-    ;} Visibility position
-
+    ;{ Visibility methods
     Show() {
         this.Visible := 1
     }
@@ -795,6 +1134,35 @@ class Shape {
         (obj.HasOwnProp("y")) ? this.y := obj.y : 0
         (obj.HasOwnProp("w")) ? this.w := obj.w : 0
         (obj.HasOwnProp("h")) ? this.h := obj.h : 0
+    }
+
+    /**
+     * Sets the position of the object.
+     * @param {int|str} x position, or 'center' to center horizontally
+     * @param {int|str} y position, or 'center' to center vertically
+     */
+    Position(x := 'center', y := 'center') {
+        if (Type(x) == 'String' || Type(y) == 'String') {
+            if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
+                this.x := (this.layerWidth - this.w) // 2
+                this.y := (this.layerHeight - this.h) // 2
+            }
+            else if x ~= 'i)c(ent(er)?)?' {
+                this.x := (this.layerWidth - this.w) // 2
+                this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
+            }
+            else if y ~= 'i)c(ent(er)?)?' {
+                this.y := (this.layerHeight - this.h) // 2
+                this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
+            }
+        } else if IsInteger(x) && IsInteger(y) {
+            this.x := x
+            this.y := y
+        } else if IsFloat(x) && IsFloat(y) {
+            this.x := Ceil(x)
+            this.y := Ceil(y)
+        } else
+            throw Error('Integer, float or keyword.')
     }
     ;}
 
@@ -842,35 +1210,6 @@ class Shape {
         ;this.Fn := (*) => (fn)(params*) ; nada
         return
     }
-
-    /**
-	 * Sets the position of the object.
-	 * @param {int|str} x position, or 'center' to center horizontally
-	 * @param {int|str} y position, or 'center' to center vertically
-	 */
-	Position(x := 'center', y := 'center') {
-		if (Type(x) == 'String' || Type(y) == 'String') {
-			if x ~= 'i)c(ent(er)?)?' && y ~= 'i)c(ent(er)?)?' {
-				this.x := (this.layerWidth - this.w) // 2
-				this.y := (this.layerHeight - this.h) // 2
-			}
-            else if x ~= 'i)c(ent(er)?)?' {
-				this.x := (this.layerWidth - this.w) // 2
-				this.y := y ? IsFloat(y) ? Ceil(y) : y : this.y
-			}
-            else if y ~= 'i)c(ent(er)?)?' {
-				this.y := (this.layerHeight - this.h) // 2
-				this.x := x ? IsFloat(x) ? Ceil(x) : x : this.x
-			}
-		} else if IsInteger(x) && IsInteger(y) {
-			this.x := x
-			this.y := y
-		} else if IsFloat(x) && IsFloat(y) {
-			this.x := Ceil(x)
-			this.y := Ceil(y)
-		} else
-			throw Error('Integer, float or keyword.')
-	}
 
     ;{ Animation function
     /**
@@ -931,27 +1270,150 @@ class Shape {
             v.h := pos[2]
         }
     }
+
+    /**
+     * Moves the shape to the specified position with a sliding effect.
+     * @param {integer} x The X-coordinate position
+     * @param {integer} y The Y-coordinate position
+     * @param {integer} Unit unit size of the sliding increment
+     */
+    Shrink(Unit := 1) {
+        local fake, w, h
+        H := W := 1
+        this.Text()
+        fake := Rectangle(this.x, this.y, this.w, this.h, '0x00FFFFFF')
+        loop {
+            ; calculate w, h stepsize
+            (this.h > this.w) ? w := this.w / this.h : 0
+            (this.w > this.h) ? h := this.h / this.w : 0
+            ; stop reducing the value if less !value
+            (this.w > 0) ? (this.w -= Ceil(unit * W), this.x += Ceil(unit * W / 2)) : this.w := 0
+            (this.h > 0) ? (this.h -= Ceil(unit * H), this.y += Ceil(unit * H / 2)) : this.h := 0
+            if (!this.h || !this.w) {
+                Draw(this.LayerId)
+                this.Visible := 0
+                return
+            }
+            Draw(this.LayerId)
+        }
+    }
+
+    /**
+     * Shrinks the object(s). This static method reduces the size of the specified object(s) by the given unit size. Only works on the same layer`!`
+     * @param {number} unit - The unit size of the shrinkage.
+     * @param {object} objects - The object(s) to be shrunk.
+     */
+    static Shrink(unit := 1, objects*) {
+
+        local x1, y1, x2, y2, nulled, whichlayer, v, index, w, h
+
+        for v in objects {
+            if (A_index == 1) {
+                x1 := v.x
+                y1 := v.y
+                x2 := v.x + v.w
+                y2 := v.y + v.h
+            }
+            (v.x < x1) ? x1 := v.x : 0
+            (v.y < y1) ? y1 := v.y : 0
+            (v.x + v.w > x2) ? x2 := v.x + v.w : 0
+            (v.y + v.h > y2) ? y2 := v.y + v.h : 0
+        }
+
+        objects.Push(Rectangle(x1, y1, x2 - x1, y2 - y1, '0x00FFFFFF'))
+        nulled := 0
+        whichlayer := ""
+
+        loop {
+
+            index := A_index
+            nulled := 0
+
+            for v in objects {
+
+                if (!InStr(whichlayer, v.layerid))
+                    whichlayer .= v.LayerId "|"
+
+                if (index == 1)
+                    v.str := ""
+
+                H := W := 1
+                (v.h > v.w) ? W := v.w / v.h : 0
+                (v.w > v.h) ? H := v.h / v.w : 0
+
+                (v.w > 0) ? (v.w -= Ceil(unit * W), v.x += Ceil(w / 2 * unit)) : v.w := 0
+                (v.h > 0) ? (v.h -= Ceil(unit * H), v.y += Ceil(h / 2 * unit)) : v.h := 0
+
+                if (0 >= v.h || 0 >= v.w) {
+                    nulled += 1
+                    v.visible := 0
+                }
+            }
+
+            loop parse, whichlayer, "|" {
+                if !A_LoopField
+                    continue
+                Draw(Integer(A_LoopField))
+                if (nulled = objects.Length) { ;-1
+                    for v in objects
+                        v.Hide()
+                    try Draw(A_LoopField)
+                    return
+                }
+            }
+
+        }
+    }
+
+    /**
+     * Grows the object(s). This static method increases the size of the specified object(s) by the given unit size. Only works on the same layer`!`
+     * @param {number} unit - The unit size of the growth.
+     * @param {object} objects - The object(s) to be grown.
+     */
+    Grow(delay := 15.6) {
+        local heightEnd
+        heightEnd := this.h
+        this.h := 0
+        while (heightEnd > this.h) {
+            this.h := heightEnd < this.h + A_Index ? heightEnd : this.h + A_Index
+            Draw(this.LayerId)
+            Sleep(delay)
+        }	
+    }
+
+    /**
+     * Grows the object(s). This static method increases the size of the specified object(s) by the given unit size.
+     * @param {number} unit - The unit size of the growth.
+     * @param {object} objects - The object(s) to be grown.
+     */
+    static Grow(delay := 15.6, Objects*) {
+        local v, nulled, pos
+        pos := []
+        for v in Objects {
+            pos.Push(v.SavePos())
+            v.h := 0
+        }
+
+        loop {
+            nulled := 0
+            for v in Objects {
+                if (pos[A_Index].h == v.h) {
+                    Nulled += 1
+                    v.Visible := 1
+                }
+                else {
+                    v.h += 1
+                }
+            }
+            Draw(objects[1].LayerId)
+            if (Nulled == Objects.Length)
+                return
+            Sleep(delay)
+        }
+        ;for v in Objects
+        ;    v.RestorePos(pos[A_Index])
+    }
     ;}
-
-    ImageWidth {
-        get => Shapes.%this.layerid%.%this.id%.Bitmap.w
-    }
-
-    ImageHeight {
-        get => Shapes.%this.layerid%.%this.id%.Bitmap.h
-    }
-
-    LayerWidth {
-        get => Layers.%this.layerid%.w
-    }
-
-    LayerHeight {
-        get => Layers.%this.layerid%.h
-    }
-
-    ToolType {
-        get => Shapes.%this.layerid%.%this.id%.Tool.type
-    }
 
     ; Required functions for constructing shapes.
     setMissingProp(&obj) {
@@ -976,57 +1438,49 @@ class Shape {
     ; Set the values in the Shapes container.
     setReferenceObj(obj) {
         return Shapes.%this.Layerid%.%this.id% := {
-            id : this.id,
-            alpha: 0xFF,
-            Bitmap : {ptr:0},
+            alpha: Shape.alpha,
+            bitmap : {ptr:0},
             color: obj.colour,
             filled: obj.filled,
-            Font : Font.getStock()
+            font : Font.getStock(),
+            id : this.id,
+            penwidth : obj.penwidth,
+            visible : Shape.visible
         }
     }
 
     ; Get the properties for the shape.
     getProperties(obj) {
         return {
-            1 : {
             ; Base
-                x : obj.x,
-                y : obj.y,
-                w : obj.w,
-                h : obj.h,
-                shape : obj.cls,
-                hasSignal : false,
+            x: obj.x,
+            y: obj.y,
+            w: obj.w,
+            h: obj.h,
+            shape: obj.cls,
+            hasSignal: false,
             ; String
-                str : "",
-                strX : 0,
-                strY : 0,
-                strH : Font.default.alignmentH, 
-                strV : Font.default.alignmentV,
-                strQ : Font.default.quality,
+            str: "",
+            strX: 0,
+            strY: 0,
+            strH: Font.default.alignmentH,
+            strV: Font.default.alignmentV,
+            strQ: Font.default.quality,
             ; Bitmap
-                pBitmap : 0,
-                bmpX : 0,
-                bmpY : 0,
-                bmpW : 0,
-                bmpH : 0,
-                bmpSrcX : 0,
-                bmpSrcY : 0,
-                bmpSrcW : 0,
-                bmpSrcH : 0,
-                bmpW0 : 0,
-                bmpH0 : 0,
+            pBitmap: 0,
+            bmpX: 0,
+            bmpY: 0,
+            bmpW: 0,
+            bmpH: 0,
+            bmpSrcX: 0,
+            bmpSrcY: 0,
+            bmpSrcW: 0,
+            bmpSrcH: 0,
+            bmpW0: 0,
+            bmpH0: 0,
             ; Bound function
-                fn : "",
-                fnParams : ""
-            },
-            2 : {
-            ; Unique setters
-                alpha : 0xFF,
-                color : 0,
-                filled : obj.filled,
-                penwidth : obj.penwidth,
-                visible : true
-            }
+            fn: "",
+            fnParams: ""
         }
     }
 
@@ -1035,27 +1489,27 @@ class Shape {
         local p := props
         switch obj.cls {
             case "Polygon", "FilledPolygon", "Triangle", "FilledTriangle", "Beziers", "Lines":
-                p.1.pPoints := 0
-                p.1.points := 0
+                p.pPoints := 0
+                p.points := 0
                 if !(obj.cls ~= "Beziers|Lines")
-                    p.1.fillmode := obj.fillmode
+                    p.fillmode := obj.fillmode
             case "Arc", "Pie", "FilledPie":
-                p.1.startangle := obj.startangle
-                p.1.sweepangle := obj.sweepangle
+                p.startangle := obj.startangle
+                p.sweepangle := obj.sweepangle
             case "Bezier":
-                p.1.x1 := obj.x1
-                p.1.y1 := obj.y1
-                p.1.x2 := obj.x2
-                p.1.y2 := obj.y2
-                p.1.x3 := obj.x3
-                p.1.y3 := obj.y3
-                p.1.x4 := obj.x4
-                p.1.y4 := obj.y4
+                p.x1 := obj.x1
+                p.y1 := obj.y1
+                p.x2 := obj.x2
+                p.y2 := obj.y2
+                p.x3 := obj.x3
+                p.y3 := obj.y3
+                p.x4 := obj.x4
+                p.y4 := obj.y4
             case "Line":
-                p.1.x1 := obj.x1
-                p.1.y1 := obj.y1
-                p.1.x2 := obj.x2
-                p.1.y2 := obj.y2
+                p.x1 := obj.x1
+                p.y1 := obj.y1
+                p.x2 := obj.x2
+                p.y2 := obj.y2
         }
         return
     }
@@ -1066,13 +1520,19 @@ class Shape {
         local shp := Shapes.%this.layerid%.%this.id%
         
         obj.cls := this.base.__Class
-        if (obj.HasOwnProp("Filled") && obj.filled) {
+        if (obj.filled == 1) {
             shp.Tool := SolidBrush(obj.colour)
             obj.cls := "Filled" obj.cls
         }
-        else if (obj.penwidth >= 1 && obj.penwidth <= 100) {
+        else if ((!obj.filled || obj.filled > 1) ) {
+            if (obj.filled == 0)
+                obj.penwidth := 1
+            else if (obj.filled > 1 && obj.penwidth <= 100) {
+                obj.penwidth := obj.filled
+            }
+            else
+                throw ValueError("[!] Invalid pen width value")
             shp.Tool := Pen(obj.colour, obj.penwidth)
-            obj.filled := 0
         }
         else {
             throw ValueError("[!] Invalid value during tool initialization")
@@ -1082,18 +1542,10 @@ class Shape {
 
     ; Set the base properties for the shape.
     setBaseProps(props) {
-        loop 2 {
-            i := A_Index
-            for name, value in props.%i%.OwnProps() {
-                getter := get_Shape.Bind(name)
-                switch i {
-                    case 1: setter := set_Shape.Bind(name)
-                    case 2: setter := this.%("set_" name)%
-                }
-                this.DefineProp(name, {get : getter, set : setter})
-                this.%name% := value
-            }
-        } 
+        for name, value in props.OwnProps() {
+            this.DefineProp(name, {get: get_Shape.Bind(name), set: set_Shape.Bind(name)})
+            this.%name% := value
+        }
     }
 
     ; Set the unique properties for the shape if needed.
@@ -1159,8 +1611,8 @@ class Shape {
             throw ValueError("[?] The current active layer doesn't exist.")
 
         this.layerid := Layer.activeid
-        this.id := id := ++Shape.id
-
+        this.id := ++Shape.id
+        
         ; Some properties depend on others during initialization.
         this.setMissingProp(&obj)
         this.setReferenceObj(obj)
@@ -1175,15 +1627,6 @@ class Shape {
         OutputDebug("[+] Shape " this.id " created on Layer " this.layerId "`n")  
     }
 
-    /**
-     * Removes `Prototype` and `__Init` methods for faster lookup
-     * in the Shapes.OwnProps() enumeration.
-     */
-    static __New() {
-        Shapes.DeleteProp("__Init")
-        Shapes.DeleteProp("Prototype")
-    }
-
     ; Release resources (font, tool, bitmap)
     __Delete() {
         if (Shapes.HasProp(this.LayerId) && Shapes.%this.LayerId%.HasProp(this.id)) {
@@ -1191,6 +1634,15 @@ class Shape {
             Shapes.%this.Layerid%.DeleteProp(this.id)
             OutputDebug("[-] Shape " this.id " deleted from Layer " this.Layerid "`n") 
         }
+    }
+
+    /**
+     * Removes `Prototype` and `__Init` methods for faster lookup
+     * in the Shapes.OwnProps() enumeration.
+     */
+    static __New() {
+        Shapes.DeleteProp("__Init")
+        Shapes.DeleteProp("Prototype")
     }
 
     static __Delete() {
@@ -1205,176 +1657,6 @@ class Shape {
             }
         }
     }
-
-    ;{ Property setters
-
-    set_PenWidth(value) {
-        if (value >= 1 && value <= 100) {
-            Shapes.%this.Layerid%.%this.id%.Tool.Width := value
-            return
-        }
-        throw ValueError("[!] Invalid value for PenWidth property")
-    }
-
-    set_Visible(value) {
-        if !(IsBool(value)) {
-            if (value !== -1 || value != "Toggle")
-                return
-            Shapes.%this.Layerid%.%this.id%.Visible ^= 1
-            return
-        }
-        Shapes.%this.Layerid%.%this.id%.Visible := value
-    }
-
-    set_Alpha(value) {
-        local obj, c
-        if (!isAlphaNum(value))
-            return
-        
-        ; Return if no change in alpha value
-        obj := Shapes.%this.Layerid%.%this.id%
-        if (obj.Alpha == value)
-            return
-
-        ; Set the new tool color and alpha value
-        if (obj.Tool.Type == 0 || obj.Tool.Type == 5) {
-            obj.Tool.Color := (obj.Color & 0x00FFFFFF) | (value << 24)
-        }
-        else if (obj.Tool.Type == 4) {
-            c :=  obj.Tool.Color
-            c[1] := (c[1] & 0x00FFFFFF) | (value << 24)
-            c[2] := (c[2] & 0x00FFFFFF) | (value << 24)
-            obj.Tool.Color := c
-        }
-        ; TODO: finish the implementation for the other tool types
-        
-        obj.Alpha := value
-    }
-
-    set_Color(value) {
-
-        local obj
-        
-        if (value && Type(value) == "Integer" || (Type(value) == "String")) {
-
-            obj := Shapes.%this.Layerid%.%this.id%
-            
-            value := Color(value)
-
-            ; Erase the current tool if the shape is not a brush or pen
-            if (!obj.Tool || obj.Tool.Type !== 0 && obj.Tool.Type !== 5) {
-                obj.Tool := ""
-                if (obj.Filled)
-                    obj.Tool := SolidBrush(value)
-                else
-                    obj.Tool := Pen(value, obj.PenWidth)
-            }
-    
-            ; Set the color
-            obj.Tool.Color := value
-            return
-        }
-        else if (Type(value) == "Array") {
-
-            obj := Shapes.%this.Layerid%.%this.id%
-
-            tooltype := obj.Tool.Type
-
-            ; The name not defined, default Linear Gradient Mode
-            if (value.Length == 2) {
-
-                value[1] := Color(value[1])
-                value[2] := Color(value[2])
-
-                ; It's gradient
-                if (tooltype == 4) {
-                    obj.Tool.color := [value[1], value[2]]
-                    return
-                }
-
-                value.InsertAt(1, "")
-                    tooltype := 4
-            }
-            else {
-                switch value[1], 0 {
-                    case "Gradient": tooltype := 4
-                    case "Hatch":    tooltype := 1
-                    case "Texture":  tooltype := 2
-                    default: throw ValueError("[!]")
-                }
-            }
-
-            ; Destroy the current tool.
-            obj.Tool := ""
-
-            switch tooltype {
-                case 1:
-                ; Hatch
-                    value[2] := Color(value[2])
-                    value[3] := Color(value[3])
-                    obj.Tool := HatchBrush(value[2], value[3], value[4])
-                case 2:
-                ; Texture
-                    obj.Tool := TextureBrush(value[2]
-                    , value.has(3) ? value[3] : 0
-                    , value.has(4) ? value[4] : 100)     ; TODO: implement fit to shape
-                case 3:
-                ; PathGradient (not implemented yet)
-                    return
-                ; Gradient
-                case 4:
-                    LinearGradientMode := (value.Has(4)) ? value[4] : 0
-                    WrapMode := (value.Has(5)) ? value[5] : 1
-                    RectF := Buffer(16)
-                    NumPut("float", this.x, RectF, 0)
-                    NumPut("float", this.y, RectF, 4)
-                    NumPut("float", this.w, RectF, 8)
-                    NumPut("float", this.h, RectF, 12)
-                    obj.tool := LinearGradientBrush(value[2], value[3]
-                        , LinearGradientMode, WrapMode, RectF.ptr)
-            }
-        }
-        return
-    }
-
-    /**
-    * Changes the tool between a pen and a brush based on the filled status.
-    * @param {bool} value indicating whether the shape should be filled or not.  
-     */
-    set_Filled(value) {
-        
-        local obj, tooltype
-        
-        if (!IsBool(value))
-            return
-
-        ; Get the shape reference
-        obj := Shapes.%this.Layerid%.%this.id%
-        if (obj.Filled == value) ; && (obj.Tool.Type == 0 || obj.Tool.Type == 5)
-            return
-
-        ; Save the current color and tool type before deleting the tool
-        tooltype := obj.Tool.Type
-        clr := obj.Tool.Color
-        obj.Tool := ""
-
-        ; It's a switchback from gradient to pen
-        if (Type(clr) == "Array") {
-            clr := Random(0xFF000000, 0xFFFFFFFF)
-        }
-
-        ; Change the shape tool type
-        if (tooltype == 5) {
-            obj.Tool := SolidBrush(clr)
-            this.Shape := "Filled" this.Shape
-        }
-        else if (tooltype == 0) {
-            obj.Tool := Pen(clr, 1)
-            this.Shape := SubStr(this.Shape, 7)
-        } else
-            return
-    }
-    ;}
 }
 
 
@@ -1648,11 +1930,12 @@ class Point extends Shape {
 /**
  * A class for color manipulation and generation.
  * @property ColorNames a list of color names
- * @Example
+ * @example
+ * ; The names are case insensitive.
  * c := Color()                     ; Random color
  * c := Color("Lime")               ; Color name by calling the color class
  * c := Color.Lime                  ; Direct access to value by name
- * c := Color("Red|Blue|Green")     ; Random color from the list
+ * c := Color("red|blue|green")     ; Random color from the list
  * c := Color("0xFF0000FF")         ; 0xARGB
  * c := Color("#FF0000FF")          ; #ARGB
  * c := Color("0x0000FF")           ; 0xRGB
@@ -1664,7 +1947,7 @@ class Color {
     /**
      * Returns a random color, accepts multiple types of color inputs.
      * @param {str} c color name, ARGB, or a list of color names separated by "|"
-     * @returns {int} ARGB
+     * @return {int} ARGB
      * 
      * @credit iseahound - Graphics, https://github.com/iseahound/Graphics  
      */
@@ -1691,7 +1974,7 @@ class Color {
      * Sets the alpha channel of a color.
      * @param ARGB a valid ARGB
      * @param {int} A alpha channel value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Alpha(ARGB, A := 255) {
         A := (A > 255 ? 255 : A < 0 ? 0 : A)
@@ -1702,7 +1985,7 @@ class Color {
      * Sets the alpha channel of a color in float format.
      * @param ARGB a valid ARGB
      * @param {float} A alpha channel value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static AlphaF(ARGB, A := 1.0) {
         A := (A > 1.0 ? 255 : A < 0.0 ? 0 : Ceil(A * 255))
@@ -1713,13 +1996,13 @@ class Color {
      * Swaps the color channels of an ARGB color.
      * @param colour 
      * @param {str} mode 
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static ChannelSwap(colour, mode := "Rand") {
         
         static modes := ["RGB", "RBG", "BGR", "BRG", "GRB", "GBR"]
         
-        local A, R, G, B
+        local A, R, G, B, i, channel
         local c := 0x0
 
         if (mode ~= "i)^R(and(om)?)?$") {
@@ -1735,10 +2018,10 @@ class Color {
         B :=  0x000000ff & colour
 
         for i, channel in StrSplit(mode) {
-            switch channel {
-                case "R","r": c := c | R << 8 * (3 - i)
-                case "G","g": c := c | G << 8 * (3 - i)
-                case "B","b": c := c | B << 8 * (3 - i)
+            switch channel, 0 {
+                case "R": c := c | R << 8 * (3 - i)
+                case "G": c := c | G << 8 * (3 - i)
+                case "B": c := c | B << 8 * (3 - i)
             }
         }
         return (A << 24) | c
@@ -1749,7 +2032,7 @@ class Color {
      * @param color1 starting color
      * @param color2 end color
      * @param backforth number of transitions * 100, 2 means back and forth (doubles the array size)
-     * @returns {array}
+     * @return {array}
      */
     static GetTransition(color1, color2, backforth := false) {
         
@@ -1758,6 +2041,7 @@ class Color {
         ; Validate.
         if (backforth !== 0 && backforth !== 1)
             throw ValueError("backforth must be bool")
+
         color1 := this.Call(color1)
         color2 := this.Call(color2)
 
@@ -1782,7 +2066,7 @@ class Color {
      * @param {int} color2 end ARGB
      * @param {int|float} dist distance between the colors
      * @param {int} alpha alpha channel
-     * @returns {array}
+     * @return {array}
      */
     static LinearInterpolation(color1, color2, dist, alpha := 255) {
         
@@ -1796,7 +2080,7 @@ class Color {
             p := dist * 100
         }
         else {
-            throw ValueError("Must be an integer or float")
+            throw ValueError("Distance must be an integer or float")
         }
 
         ; Get the R, G, B components of colors
@@ -1812,8 +2096,8 @@ class Color {
         B2 :=  0x000000ff & c2
         
         ; Calculate the new values
-        R := R1 + Ceil(p * (R2 - R1))
-        G := G1 + Ceil(p * (G2 - G1))
+        R := R1 + Ceil(p * (R2 - R1)),
+        G := G1 + Ceil(p * (G2 - G1)),
         B := B1 + Ceil(p * (B2 - B1))
 
         return (alpha << 24) | (R << 16) | (G << 8) | B
@@ -1823,7 +2107,7 @@ class Color {
      * Returns a random color, accepts multiple color names, and randomness.
      * @param {str} colorName single or multiple color names separated by "|"
      * @param {int} randomness adds a random factor to each channel
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Random(colorName := "", randomness := false) {
         
@@ -1858,7 +2142,7 @@ class Color {
      * Randomize a color with a given randomness.
      * @param {int} ARGB a valid ARGB
      * @param {int} rand the randomness value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Randomize(ARGB, rand := 15) {
 
@@ -1866,8 +2150,8 @@ class Color {
         local G := (0x0000ff00 & ARGB) >>  8
         local B :=  0x000000ff & ARGB
 
-        R := Min(255, Max(0, R + Random(-rand, rand)))
-        G := Min(255, Max(0, G + Random(-rand, rand)))
+        R := Min(255, Max(0, R + Random(-rand, rand))),
+        G := Min(255, Max(0, G + Random(-rand, rand))),
         B := Min(255, Max(0, B + Random(-rand, rand)))
 
         return 0xFF000000 | (R << 16) | (G << 8) | B
@@ -1875,7 +2159,7 @@ class Color {
 
     /**
      * Returns a random ARGB, also accessible as a function (RandomARGB).
-     * @returns {int} ARGB  
+     * @return {int} ARGB  
      */
     static RandomARGB() {
         return Random(0xFF000000, 0xFFFFFFFF)
@@ -1885,7 +2169,7 @@ class Color {
      * Returns a random color with a given alpha channel from a range.
      * @param {int} alpha alpha channel value or the range minimum
      * @param {int} max maximum range value
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static RandomARGBAlphaMax(alpha := 0xFF, max := false) {
         if (alpha > 255 || alpha < 0 || max > 255 || max < 0)
@@ -1901,7 +2185,7 @@ class Color {
      * @param color2 end color
      * @param dist distance between the colors
      * @param alpha alpha channel
-     * @returns {int} ARGB
+     * @return {int} ARGB
      */
     static Transition(color1, color2, dist := 1, alpha := 255) {
         if (Type(dist) == "Float")
@@ -2104,7 +2388,7 @@ Draw(lyr) {
 
         ; Reset the world transform and perform a new translation if the layer has changed position.
         if (x1 !== lyr.x1 || y1 !== lyr.y1) {
-            DllCall("gdiplus\GdipResetWorldTransform", "ptr", gfx)
+            DllCall("gdiplus\GdipResetWorldTransform", "ptr", gfx),
             DllCall("gdiplus\GdipTranslateWorldTransform", "ptr", gfx, "float", -lyr.x1, "float", -lyr.y1, "int", 0)
         }
     }
@@ -2164,10 +2448,9 @@ Draw(lyr) {
 
         ; Draw shape.
         switch v.shape {
-            ; TODO: reimplement graphics settings, currently commented out
 
             case "Arc":
-                ;DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0)
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawArc"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2179,6 +2462,7 @@ Draw(lyr) {
                     , "float", v.sweepangle)
 
             case "Bezier":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawBezier"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2192,6 +2476,7 @@ Draw(lyr) {
                     , "float", v.y4)
 
             case "Beziers":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawBeziers"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2199,6 +2484,7 @@ Draw(lyr) {
                     , "int", v.points)
 
             case "Ellipse":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawEllipse"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2208,6 +2494,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "FilledRectangle", "FilledSquare":
+                lyr.GraphicsQuality("Rectangle")
                 DllCall("gdiplus\GdipFillRectangle"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2217,6 +2504,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "Rectangle", "Square":
+                lyr.GraphicsQuality("Rectangle")
                 DllCall("gdiplus\GdipDrawRectangle"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2226,6 +2514,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "FilledEllipse":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipFillEllipse"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2235,6 +2524,7 @@ Draw(lyr) {
                     , "float", h)
 
             case "FilledPie":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipFillPie"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2246,6 +2536,7 @@ Draw(lyr) {
                     , "float", v.sweepangle)
 
             case "Pie":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawPie"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2257,6 +2548,7 @@ Draw(lyr) {
                     , "float", v.sweepangle)
 
             case "FilledTriangle", "FilledPolygon":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipFillPolygon"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2265,6 +2557,7 @@ Draw(lyr) {
                     , "int", v.fillMode)
 
             case "Triangle", "Polygon":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawPolygon"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2272,6 +2565,7 @@ Draw(lyr) {
                     , "int", v.points)
 
             case "Line":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawLine"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2281,6 +2575,7 @@ Draw(lyr) {
                     , "float", v.y2)
 
             case "Lines":
+                lyr.GraphicsQuality("Curved")
                 DllCall("gdiplus\GdipDrawLines"
                     , "ptr", gfx
                     , "ptr", ptr
@@ -2298,11 +2593,11 @@ Draw(lyr) {
              */
 
             ; Save the current graphics settings and set the new settings for the bitmap drawing.
-            DllCall("gdiplus\GdipSaveGraphics", "ptr", gfx, "ptr*", &pState := 0)
-            DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7)      ; HighQualityBicubic
-            DllCall("gdiplus\GdipSetPixelOffsetMode", "ptr", gfx, "int", 2)        ; Half pixel offset
-            DllCall("gdiplus\GdipSetCompositingMode", "ptr", gfx, "int", 1)        ; Overwrite/SourceCopy
-            DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0)          ; No anti-alias
+            DllCall("gdiplus\GdipSaveGraphics", "ptr", gfx, "ptr*", &pState := 0),
+            DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7),     ; HighQualityBicubic
+            DllCall("gdiplus\GdipSetPixelOffsetMode", "ptr", gfx, "int", 2),       ; Half pixel offset
+            DllCall("gdiplus\GdipSetCompositingMode", "ptr", gfx, "int", 1),       ; Overwrite/SourceCopy
+            DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0),         ; No anti-alias
             DllCall("gdiplus\GdipSetCompositingQuality", "ptr", gfx, "int", 0)     ; AssumeLinear       
 
             ; Align the image to center inside the object.
@@ -2361,7 +2656,7 @@ Draw(lyr) {
                 
                 ; Split the string by the color tag.
                 text := []
-                text := StrSplit(v.str, '{color:')
+                text := StrSplit(v.str, '{color:'),
                 text.RemoveAt(1)
                 strRaw := ""
 
@@ -2384,9 +2679,9 @@ Draw(lyr) {
                 lineHeight := 0
 
                 ; Prepare a test rect for measuring.
-                testRectF := Buffer(16, 0)
-                NumPut("float", v.w, testRectF, 8)
-                NumPut("float", v.h, testRectF, 12)
+                testRectF := Buffer(16, 0),
+                NumPut("float", v.w, testRectF, 8),
+                NumPut("float", v.h, testRectF, 12),
 
                 RectF := Buffer(16)
 
@@ -2420,8 +2715,8 @@ Draw(lyr) {
                 }
 
                 ; Force left-top alignment, save brush color.
-                DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", 0)
-                DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", 0)
+                DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", 0),
+                DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", 0),
                 DllCall("gdiplus\GdipGetSolidFillColor", "ptr", v.Font.pBrush, "int*", &oriColor := 0)
 
                 ; Initial position.
@@ -2455,13 +2750,13 @@ Draw(lyr) {
                     }
 
                     ; Adjust brush color.
-                    DllCall("gdiplus\GdipSetSolidFillColor", "ptr", v.Font.pBrush, "int", Color(text[index][1]))
+                    DllCall("gdiplus\GdipSetSolidFillColor", "ptr", v.Font.pBrush, "int", Color(text[index][1])),
 
                     ; Update the RectF structure for the current character.
-                    NumPut("float", x, RectF, 0)
-                    NumPut("float", y, RectF, 4)
-                    NumPut("float", chrWidth.%A_LoopField%, RectF, 8)
-                    NumPut("float", lineHeight, RectF, 12)
+                    NumPut("float", x, RectF, 0),
+                    NumPut("float", y, RectF, 4),
+                    NumPut("float", chrWidth.%A_LoopField%, RectF, 8),
+                    NumPut("float", lineHeight, RectF, 12),
 
                     ; Draw the character.
                     DllCall("gdiplus\GdipDrawString"
@@ -2493,16 +2788,12 @@ Draw(lyr) {
                     v.Font.alignmentV := v.strV
                 }
 
-                ; Set the text vertical and horizontal string format alignment. ; -> TODO check if switch required
-                DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", v.Font.hFormat, "int", v.font.AlignmentH)
-                DllCall("Gdiplus\GdipSetStringFormatLineAlign", "ptr", v.Font.hFormat, "int", v.font.AlignmentV)
-
                 ; Create a RectF structure to hold the bounding rectangle of the string.
-                RectF := Buffer(16)
-                NumPut("float", v.x + v.strX, RectF, 0)
-                NumPut("float", v.y + v.strY, RectF, 4)
-                NumPut("float", v.w, RectF, 8)
-                NumPut("float", v.h, RectF, 12)
+                RectF := Buffer(16),
+                NumPut("float", v.x + v.strX, RectF, 0),
+                NumPut("float", v.y + v.strY, RectF, 4),
+                NumPut("float", v.w, RectF, 8),
+                NumPut("float", v.h, RectF, 12),
 
                 ; Draw the string without any measurement.
                 DllCall("gdiplus\GdipDrawString"
@@ -2530,7 +2821,7 @@ Draw(lyr) {
     ; Update the window
     ; credit: iseahound, TextRender v1.9.3, RenderOnScreen
     ; https://github.com/iseahound/TextRender
-
+    
     DllCall("UpdateLayeredWindow"
         ,     "ptr", lyr.hwnd                  ; hWnd
         ,     "ptr", 0                         ; hdcDst
@@ -2551,15 +2842,15 @@ Draw(lyr) {
  */
 class Render {
 
-    ; Will be important to not update the window automatically. (e.g.: saving)
+    ; Can be disable to only render the layer, but not display it on the screen.
     static UpdateWindow := true
 
     ; For a single layer rendering.
     static Layer(obj) {
 
         ; Start timer, draw layer.
-        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
-        Draw(obj)
+        start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf),
+        Draw(obj),
 
         ; Calculate elapsed time in milliseconds since the last frame update.
         elapsed := ((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
@@ -2569,9 +2860,8 @@ class Render {
         waited := 0
         if (Fps.frametime && Fps.frametime > elapsed) {
             start := (DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf)
-            while (Fps.frametime >= elapsed + waited) {
+            while (Fps.frametime >= elapsed + waited)
                 waited := ((DllCall("QueryPerformanceCounter", "int64*", &qpc := 0), qpc / this.qpf) - start) * 1000
-            }
         }
 
         ; Update the Fps object with the new frame data.
@@ -2653,7 +2943,7 @@ class Fps {
     static __New() {
         
         ; Hold the graphics object
-        this.id := 2**63 - 1 ; largest int in AHK
+        this.id := 2**63 - 1 ; largest integer in AutoHotkey
         this.Layer := 0
         this.Shape := 0
         
@@ -2666,10 +2956,6 @@ class Fps {
         this.lastrender := 0.0001
         this.totalrender := 0.0001
         this.rendertime := 0.0001
-
-        ; Target fps bounds
-        this.max := 99999
-        this.min := 0.001
         
         ; Positioning
         this.w := 200
@@ -2693,10 +2979,10 @@ class Fps {
             Layer.activeid := this.id
 
             ; Create layer and shape
-            this.Layer := Layer(, , this.w, this.h)
+            this.Layer := Layer(this.w, this.h)
             this.Shape := Rectangle(, , this.w, this.h, "black")
 
-            ; Can be overridden via Fps.pos := value
+            ; Can be overridden via Fps.Position()
             this.Position(this.pos)
 
             ; Set back id
@@ -2705,7 +2991,7 @@ class Fps {
 
         ; Update fps panel text, draw fps layer
         this.Update()
-        Draw(this.Layer) ; we cannot use this here
+        Draw(this.Layer)
 
         ; Add delay
         if (delay)
@@ -2831,19 +3117,11 @@ class Fps {
                 this.position(position)
         }
 
-        ; Hurting my eyes, needs a rework
-        if (!targetfps || targetfps ~= "i)Max(imum)?") {
-            this.target := Fps.max
+        if (!targetfps || targetfps ~= "i)max(imum)?") {
+            this.target := 2**32
         }
         else if (Type(targetfps) == "Integer") {
-            switch {
-                case targetfps <= this.max && targetfps >= this.min:
-                    this.target := targetfps
-                case targetfps > this.max:
-                    this.target := this.max
-                case targetfps < this.min:
-                    this.target := this.min
-            }
+            this.target := targetfps
         }
         else if (Type(targetfps) == "Float") {
             this.target := Integer(targetfps)
@@ -2851,7 +3129,10 @@ class Fps {
         else if (Type(targetfps) == "String") {
             try	this.target := Integer(targetfps)
             catch
-                throw ValueError "Invalid Fps target"
+                throw ValueError("Invalid Fps")
+        }
+        else {
+            throw TypeError("Invalid Fps")
         }
                 
         this.frametime := Round(1000 / this.target, 2)
@@ -2860,14 +3141,13 @@ class Fps {
     }
 
     /**
-     * Removes the fps panel. If persistent End() will remove it,
+     * Removes the fps panel. If the panel is persistent End() will remove it,
      * otherwise it will hang the process.
      */
     static __Delete() {
         if (Type(Fps.Layer) == "Layer") {
-            if (Fps.HasOwnProp("Remove")) {
+            if (Fps.HasOwnProp("Remove"))
                 this.Remove()
-            }
         }
     }
 }
@@ -2884,6 +3164,7 @@ class Bitmap {
      * @param height the height of the bitmap
      * 
      * @credit iseahound - Textrender 1.9.3, DrawOnGraphics
+     * https://github.com/iseahound/TextRender
      */
     CreateFromScan0(width := 1, height := 1) {
         DllCall("gdiplus\GdipCreateBitmapFromScan0"
@@ -2948,13 +3229,13 @@ class Bitmap {
 
         ; Calculate the new bitmap size.
         if (option ~= "i)w(\d+)\s*h(\d+)") {
-            w := RegExReplace(option, ".*w(\d+).*", "$1")
-            h := RegExReplace(option, ".*h(\d+).*", "$1")
-            dstWidth := Ceil(w ? w : this.w * h / this.h)
+            w := RegExReplace(option, ".*w(\d+).*", "$1"),
+            h := RegExReplace(option, ".*h(\d+).*", "$1"),
+            dstWidth := Ceil(w ? w : this.w * h / this.h),
             dstHeight := Ceil(h ? h : this.h * w / this.w)
         }
         else {
-            dstWidth := Ceil(this.w * option * 0.01)
+            dstWidth := Ceil(this.w * option * 0.01),
             dstHeight := Ceil(this.h * option * 0.01)
         }
 
@@ -2962,9 +3243,9 @@ class Bitmap {
         ; 0xE200B = PixelFormat32bppPARGB
         
         ; Create the new bitmap, a graphics context, set the smoothing mode, interpolation mode.
-        DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", dstWidth, "int", dstHeight, "int", 0, "int", 0xE200B, "ptr", 0, "ptr*", &pBitmap:=0)
-        DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pBitmap, "ptr*", &gfx:=0)
-        DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 4)         ; SmoothingModeAntiAlias
+        DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", dstWidth, "int", dstHeight, "int", 0, "int", 0xE200B, "ptr", 0, "ptr*", &pBitmap:=0),
+        DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pBitmap, "ptr*", &gfx:=0),
+        DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 4),         ; SmoothingModeAntiAlias
         DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7)     ; InterpolationModeHighQualityBicubic
 
         ; Apply image attributes.
@@ -2983,7 +3264,7 @@ class Bitmap {
             cmatrix := m
 
             ; Create a new image attributes object.
-            DllCall("gdiplus\GdipCreateImageAttributes", "ptr*", &ImageAttr:=0)
+            DllCall("gdiplus\GdipCreateImageAttributes", "ptr*", &ImageAttr:=0),
             
             ; Set the image attributes color matrix.
             DllCall("gdiplus\GdipSetImageAttributesColorMatrix"
@@ -3017,7 +3298,7 @@ class Bitmap {
             DllCall("gdiplus\GdipDisposeImageAttributes", "ptr", ImageAttr)
 
         ; Dispose the original bitmap, delete the temporary graphics.
-        DllCall("gdiplus\GdipDisposeImage", "ptr", this.ptr)
+        DllCall("gdiplus\GdipDisposeImage", "ptr", this.ptr),
         DllCall("gdiplus\GdipDeleteGraphics", "ptr", gfx)
 
         ; Set the new pointer and dimensions.
@@ -3165,18 +3446,17 @@ class ColorMatrix {
 class Font {
 
     ; Default rendering quality for string during drawing
-    ; TODO: Layer's have their own quality settings, since they own the Graphics object
     static quality := 0
 
     ; Default properties, can be overridden by the user
     static default := {
-        family : "Tahoma",   ; font family name (installed on the system)
-        style : "Regular",   ; see Style flags below
-        size : 10,           ; font size
-        colour : 0xFFFFFFFF, ; font colour
-        quality : 0,         ; rendering quality
-        alignmentH : 1,      ; left 0, center 1, right 2
-        alignmentV : 1       ; top 0, middle 1, bottom 2
+        family : "Tahoma",       ; font family name (installed on the system)
+        style : "Regular",       ; see Style flags below
+        size : 10,               ; font size
+        colour : 0xFFFFFFFF,     ; font colour
+        quality : 0,             ; rendering quality
+        alignmentH : 1,          ; left 0, center 1, right 2
+        alignmentV : 1           ; top 0, middle 1, bottom 2
     }
 
     ; Style flags
@@ -3189,7 +3469,7 @@ class Font {
           Strikeout  : 8 }
 
     ; StringFormat flags specifies the text layout and formatting options
-    ; TODO: implement later, currently just information (also rendering hint)
+    ; TODO: implement later, currently just information
     static StringFormat := {
         DirectionRightToLeft  : 0x0001,
         DirectionVertical     : 0x0002,
@@ -3209,7 +3489,7 @@ class Font {
         AntiAliasGridFit         : 3,
         AntiAlias                : 4 }
     
-    ; Make style and rendering flags accessible by value
+    ; Make style and othere flags accessible by value
     static __New() {
         local key, value
         for key, value in this.Style.OwnProps() {
@@ -3218,10 +3498,13 @@ class Font {
         for key, value in this.StringFormat.OwnProps() {
             this.StringFormat.%value% := key
         }
+        for key, value in this.RenderingHint.OwnProps() {
+            this.RenderingHint.%value% := key
+        }
     }
 
     /**
-     * Retrieves the default stock font instance, every shape uses this font by default
+     * Retrieves the default stock font instance, every shape uses this font by default.
      * @returns {Font} stock font instance
      */
     static getStock() {
@@ -3244,8 +3527,10 @@ class Font {
      * @param {int} alignmentH horizontal alignment
      * @param {int} alignmentV vertical alignment
      */
-    static Call(family?, size?, style?, colour?, alignmentH?, alignmentV?) {
+    static Call(family?, size?, style?, colour?, quality?, alignmentH?, alignmentV?) {
         
+        local id
+
         ; Paramater validation, family
         if (!IsSet(family)) {
             family := Font.default.family
@@ -3269,7 +3554,7 @@ class Font {
             style := Font.default.style
         }
         else if (!Font.Style.HasOwnProp(style)) {
-            OutputDebug("[!] Invalid Font style id by number`n")
+            OutputDebug("[!] Invalid Font style`n")
             return
         }
         style := Font.Style.%style%
@@ -3299,6 +3584,16 @@ class Font {
             OutputDebug("[!] Invalid vertical alignment value`n")
             return
         }
+
+        ; Quality
+        if (!IsSet(quality)) {
+            quality := Font.default.quality
+        }
+        else if (!Font.RenderingHint.HasOwnProp(quality)) {
+            OutputDebug("[!] Invalid rendering quality`n")
+            return
+        }
+        quality := Font.RenderingHint.%quality%
         
         ; Create a unique id for the font
         id := family "|" size "|" style "|" colour
@@ -3315,34 +3610,35 @@ class Font {
         }	
 
         ; Create the font using GDI+ functions, code based on:
-        ; TextRender v1.9.3 - DrawOnGraphics by iseahound
+        ; credit: iseahound - TextRender v1.9.3, DrawOnGraphics
+        ; https://github.com/iseahound/TextRender
         DllCall("gdiplus\GdipCreateFontFamilyFromName"
                 ,   "ptr", StrPtr(family)  ; font family name
                 ,   "int", 0               ; system font collection 0
-                ,  "ptr*", &hFamily:=0)    ; ptr to font family
+                ,  "ptr*", &hFamily:=0),   ; ptr to font family
 
         DllCall("gdiplus\GdipCreateFont"
                 ,   "ptr", hFamily         ; ptr to font family
                 , "float", size            ; font size
                 ,   "int", style           ; font style
                 ,   "int", 0               ; unit of measure
-                ,  "ptr*", &hFont:=0)      ; ptr to font
+                ,  "ptr*", &hFont:=0),     ; ptr to font
 
         DllCall("gdiplus\GdipCreateStringFormat"
                 ,   "int", 0x1000 | 0x4000 ; formatAttributes (NoWrap, NoClip)
                 ,   "int", 0 			   ; language id default
-                ,  "ptr*", &hFormat:=0)    ; ptr to string format
+                ,  "ptr*", &hFormat:=0),   ; ptr to string format
 
         ; Set string alignments, create the font own brush
-        DllCall("gdiplus\GdipSetStringFormatAlign"    , "ptr", hFormat, "int", 1)
-        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int", 1)
+        DllCall("gdiplus\GdipSetStringFormatAlign"    , "ptr", hFormat, "int", 1),
+        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int", 1),
         DllCall("gdiplus\GdipCreateSolidFill"         , "int", colour, "ptr*", &pBrush:=0)
 
         OutputDebug("[+] Font " id " created`n")
         
-        return Font.cache.%id% := {hFont:hFont, hFamily:hFamily, hFormat:hFormat
-            , pBrush:pBrush, id:id, alignmentH:alignmentH, alignmentV:alignmentV
-            , used:1, style : style, quality : Font.quality}
+        return Font.cache.%id% := {hFont:hFont, hFamily:hFamily, hFormat:hFormat, family:family
+            , pBrush:pBrush, color:colour, id:id, alignmentH:alignmentH, alignmentV:alignmentV
+            , used:1, style : style, quality : quality, size : size}
     }
 
     ; User should not touch these two
@@ -3356,6 +3652,8 @@ class Font {
      */
     static RemoveAccess(id) {
 
+        local fnt
+
         ; Deleted already
         if !Font.cache.HasOwnProp(id)
             return
@@ -3366,9 +3664,9 @@ class Font {
 
         ; Delete font resources
         fnt := Font.cache.%id%
-        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", fnt.hFormat)
-        DllCall("gdiplus\GdipDeleteFont", "ptr", fnt.hFont)
-        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", fnt.hFamily)
+        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", fnt.hFormat),
+        DllCall("gdiplus\GdipDeleteFont", "ptr", fnt.hFont),
+        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", fnt.hFamily),
         DllCall("gdiplus\GdipDeleteBrush", "ptr", fnt.pBrush)
 
         ; Remove property
@@ -3386,6 +3684,7 @@ class Font {
      * Deletes the font instance and its associated resources.
      */
     static __Delete() {
+        local id, f
         ; Dispose will override used count during deletion
         this.dispose := true
         OutputDebug("[i] Deleting all fonts...`n")
@@ -3461,20 +3760,15 @@ class Graphics {
 
 /**
  * The `Pen` class represents a drawing pen used to draw lines and shapes.  
- * @property {ARGB} Color - Gets or sets the color of the pen.
- * @property {Int} Width - Gets or sets the width of the pen.
+ * @property {ARGB} color - Gets or sets the color of the pen.
+ * @property {int} width - Gets or sets the width of the pen.
  */
 class Pen {
 
     /**
      * @property Color Gets or sets the color of the pen.
-     * @get clr := this.Color
-     * @set {ARGB} this.Color := 0xFF000000
-     *   
-     * this.Color := 4249542579 {iARGB}  
-     * this.Color := "Gray"     {cName}
      */
-    color {
+    Color {
         get {
             local value
             return (DllCall("gdiplus\GdipGetPenColor", "ptr", this.ptr, "int*", &value:=0), value)
@@ -3483,11 +3777,9 @@ class Pen {
     }
 
     /**
-     * @property width - Gets or sets the width of the pen.
-     * @get penWidth := this.Width
-     * @set this.Width := 1
+     * @property Width Gets or sets the width of the pen.
      */
-    width {
+    Width {
         get {
             local value
             return (DllCall("gdiplus\GdipGetPenWidth", "ptr", this.ptr, "float*", &value:=0), value)
@@ -3557,9 +3849,7 @@ class Brush {
 class SolidBrush extends Brush {
 
     /**
-     * @property color gets or sets the color of the brush
-     * @get clr := this.Color
-     * @set this.Color := 0xFF000000
+     * @property color gets or sets the color of the SolidBrush
      */
     color {
         get {
@@ -3592,7 +3882,6 @@ class HatchBrush extends Brush {
     __New(foreARGB, backARGB, hatchStyle) {
         if (hatchStyle > 53 || hatchStyle < 0)
             hatchStyle := this.getStyle(hatchStyle)
-        this.color := [foreARGB, backARGB, hatchStyle]     
         DllCall("gdiplus\GdipCreateHatchBrush"
             ,  "int", hatchStyle      ; hatchStyle
             ,  "int", foreARGB        ; foreground ARGB
@@ -3606,12 +3895,12 @@ class HatchBrush extends Brush {
     ; Verify hatch style input.
     getStyle(value) {
         if (Type(value) == "String" && HatchBrush.styleName.HasProp(value))
-            return HatchBrush.StyleName.%value%
+            return HatchBrush.styleName.%value%
         throw ValueError("Invalid Hatch style")
     }
 
     ; Names in array.
-    static Style :=
+    static style :=
         [ "HatchStyleHorizontal"   , "Vertical"             , "ForwardDiagonal"      ; 0-3
         , "BackwardDiagonal"       , "Cross"                , "DiagonalCross"        ; 4-5
         , "05Percent"              , "10Percent"            , "20Percent"            ; 6-8
@@ -3633,9 +3922,9 @@ class HatchBrush extends Brush {
 
     ; Make accessible the style names as a dictionary.
     static __New() {          
-        this.StyleName := {}
-        for name in this.Style {
-            this.StyleName.%name% := A_Index - 1
+        this.styleName := {}
+        for name in this.style {
+            this.styleName.%name% := A_Index - 1
         }
     }
 }
@@ -3729,7 +4018,7 @@ class LinearGradientBrush extends Brush {
      * @param {int} pRectF 
      */
     __New(foreARGB, backARGB, gradMode := 1, wrapMode := 1, pRectF := 0) {
-        this.LinearGradientMode(&gradMode)
+        this.LinearGradientMode(&gradMode),
         DllCall("gdiplus\GdipCreateLineBrushFromRect"
             ,  "ptr", pRectF            ; pointer to rect structure 
             ,  "int", foreARGB          ; foreground ARGB
@@ -3743,27 +4032,16 @@ class LinearGradientBrush extends Brush {
     }
 
     /**
-     * Sets the colors of a LinearGradientBrush by a method call.
-     * @param foreARGB 
-     * @param backARGB 
-     */
-    Color(foreARGB, backARGB) {
-        DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", foreARGB, "int", backARGB)
-    }
-
-    /**
      * Gets or sets the colors of a LinearGradientBrush.
      * @get returns an array [color1, color2]
      * @set this.Color := [0xFF000000, 0xFFFFFFFF]
      */
     Color {
-
         get {
             local c1, c2
             return (DllCall("gdiplus\GdipGetLineColors", "ptr", this.ptr, "int*", &c1:=0, "int*", &c2:=0), [c1, c2])
         }
-
-        set =>  DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", value[1], "int", value[2])
+        set => DllCall("gdiplus\GdipSetLineColors", "ptr", this.ptr, "int", value[1], "int", value[2])
     } 
 }
 
@@ -3807,39 +4085,38 @@ Clear() => Clean()
  * Export a layer to a file.
  * @param {obj} lyr layer object
  * @param {str} path output file path
- * 
  * @credit iseahound - ImagePut v1.11, select_codec
  * https://github.com/iseahound/ImagePut
  */
 SaveLayer(lyr, filepath) {
-	
+    
     ; Create a bitmap from the layer.
     DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", Graphics.%lyr.id%.hbm, "ptr", 0, "ptr*", &pBitmap:=0)
 
     pCodec := Buffer(16)
     ; Get the CLSID of the PNG codec.
-	DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
-	DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
-	DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+    DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
+    DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
+    DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
     return
 }
 
 /**
  * Takes a screenshot of the screen.
- * @param {str} filepath output file path
- * @param {int} x coordinate
- * @param {int} y coordinate
- * @param {int} w width
- * @param {int} h height
+ * @param  {str} filepath file path of output
+ * @param  {int} x coordinate
+ * @param  {int} y coordinate
+ * @param  {int} w width
+ * @param  {int} h height
  * @return {ptr} pointer to Bitmap  
  * 
- * @credit iseahound - ImagePut v1.11 ScreenshotToBuffer
+ * @credit iseahound - ImagePut v1.11 ScreenshotToBuffer  
  * https://github.com/iseahound/ImagePut
  */
 Screenshot(filepath, x := 0, y := 0, w := 0, h := 0) {
     
     (!w) ? w := A_ScreenWidth : 0
-	(!h) ? h := A_ScreenHeight : 0
+    (!h) ? h := A_ScreenHeight : 0
 
     hdc := DllCall("CreateCompatibleDC", "ptr", 0, "ptr")
     bi := Buffer(40, 0)          ; sizeof(bi) = 40
@@ -3851,7 +4128,7 @@ Screenshot(filepath, x := 0, y := 0, w := 0, h := 0) {
     hbm := DllCall("CreateDIBSection", "ptr", hdc, "ptr", bi, "uint", 0, "ptr*", &pBits:=0, "ptr", 0, "uint", 0, "ptr")
     obm := DllCall("SelectObject", "ptr", hdc, "ptr", hbm, "ptr")
 
-	; Retrieve the device context for the screen.
+    ; Retrieve the device context for the screen.
     sdc := DllCall("GetDC", "ptr", 0, "ptr")
 
     ; Copies a portion of the screen to a new device context.
@@ -3868,16 +4145,16 @@ Screenshot(filepath, x := 0, y := 0, w := 0, h := 0) {
     DllCall("DeleteObject", "ptr", hbm)
     DllCall("DeleteDC",     "ptr", hdc)
 
-	if IsSet(filepath) {
+    if IsSet(filepath) {
         pCodec := Buffer(16)
         ; Get the CLSID of the PNG codec.
-	    DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
-	    DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
-		DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
-		return
-	}
-	
-	return pBitmap
+        DllCall("ole32\CLSIDFromString", "wstr", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "ptr", pCodec, "hresult")
+        DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
+        DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+        return
+    }
+    
+    return pBitmap
 }
 
 /** Return a random ARGB with 0xFF alpha.
@@ -3984,8 +4261,8 @@ IsBool(int) {
  * @param {int} 
  * @return {bool}
  */
-IsAlphaNum(int) {
-    return (Type(int) == "Integer" && int <= 255 && int >= 0) ? true : false
+IsAlphaValue(int) {
+    return (Type(int) == "Integer" && int <= 0xFF && int >= 0x0) ? true : false
 }
 
 /**
@@ -3993,16 +4270,15 @@ IsAlphaNum(int) {
  * @param ARGB 
  */
 IsARGB(ARGB) {
-    if (Type(ARGB) == "Integer")
-        return (ARGB >= 0x00000000 && ARGB <= 0xFFFFFFFF) ? true : false
-    else
     if (Type(ARGB) == "String")
         return (RegExMatch(ARGB, "^(0x|#)?[0-9a-fA-F]{6,8}$")) ? true : false
+    else if (Type(ARGB) == "Integer")
+        return (ARGB >= 0x00000000 && ARGB <= 0xFFFFFFFF) ? true : false
     return false
 }
 
 /**
- * Convert an int to ARGB.
+ * Convert an int to ARGB format.
  * @param {int} 
  * @return {str}
  * Slightly performs better than Format("{:08X}", int)
@@ -4011,11 +4287,11 @@ IsARGB(ARGB) {
 itoARGB(int) {
     static buf := Buffer(20)
     DllCall("wsprintf", "ptr", buf, "str", "0x%X", "int", int, "Cdecl")
-     return StrGet(buf)
+    return StrGet(buf)
 }
 
 /**
- * Alias for itoARGB, convert an int to ARGB.
+ * Alias for itoARGB, convert an int to ARGB format.
  * @param {int} 
  * @return {str}
  */
@@ -4028,6 +4304,7 @@ intToARGB(int) => itoARGB(int)
  * TODO: later
  */
 PositionByNumber(n) {
+    local p
     switch n {
         case 1: p := "BottomLeft"
         case 2: p := "BottomCenter"
