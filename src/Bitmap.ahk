@@ -2,8 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       23.03.2025
-; Version    0.7.2
+; Date       13.04.2025
+; Version    0.7.3
 
 /**
  * Represents a Gdiplus Bitmap class that can be used for drawing images.
@@ -81,13 +81,13 @@ class Bitmap {
 
         ; Calculate the new bitmap size.
         if (option ~= "i)w(\d+)\s*h(\d+)") {
-            w := RegExReplace(option, ".*w(\d+).*", "$1")
-            h := RegExReplace(option, ".*h(\d+).*", "$1")
-            dstWidth := Ceil(w ? w : this.w * h / this.h)
+            w := RegExReplace(option, ".*w(\d+).*", "$1"),
+            h := RegExReplace(option, ".*h(\d+).*", "$1"),
+            dstWidth := Ceil(w ? w : this.w * h / this.h),
             dstHeight := Ceil(h ? h : this.h * w / this.w)
         }
         else {
-            dstWidth := Ceil(this.w * option * 0.01)
+            dstWidth := Ceil(this.w * option * 0.01),
             dstHeight := Ceil(this.h * option * 0.01)
         }
 
@@ -95,9 +95,9 @@ class Bitmap {
         ; 0xE200B = PixelFormat32bppPARGB
         
         ; Create the new bitmap, a graphics context, set the smoothing mode, interpolation mode.
-        DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", dstWidth, "int", dstHeight, "int", 0, "int", 0xE200B, "ptr", 0, "ptr*", &pBitmap:=0)
-        DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pBitmap, "ptr*", &gfx:=0)
-        DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 4)         ; SmoothingModeAntiAlias
+        DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", dstWidth, "int", dstHeight, "int", 0, "int", 0xE200B, "ptr", 0, "ptr*", &pBitmap:=0),
+        DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pBitmap, "ptr*", &gfx:=0),
+        DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 4),         ; SmoothingModeAntiAlias
         DllCall("gdiplus\GdipSetInterpolationMode", "ptr", gfx, "int", 7)     ; InterpolationModeHighQualityBicubic
 
         ; Apply image attributes.
@@ -116,7 +116,7 @@ class Bitmap {
             cmatrix := m
 
             ; Create a new image attributes object.
-            DllCall("gdiplus\GdipCreateImageAttributes", "ptr*", &ImageAttr:=0)
+            DllCall("gdiplus\GdipCreateImageAttributes", "ptr*", &ImageAttr:=0),
             
             ; Set the image attributes color matrix.
             DllCall("gdiplus\GdipSetImageAttributesColorMatrix"
@@ -150,7 +150,7 @@ class Bitmap {
             DllCall("gdiplus\GdipDisposeImageAttributes", "ptr", ImageAttr)
 
         ; Dispose the original bitmap, delete the temporary graphics.
-        DllCall("gdiplus\GdipDisposeImage", "ptr", this.ptr)
+        DllCall("gdiplus\GdipDisposeImage", "ptr", this.ptr),
         DllCall("gdiplus\GdipDeleteGraphics", "ptr", gfx)
 
         ; Set the new pointer and dimensions.
