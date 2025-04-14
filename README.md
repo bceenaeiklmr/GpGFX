@@ -6,7 +6,7 @@ GpGFX is a graphics library for AutoHotkey v2, providing drawing and rendering c
 
 - Watch a demo of GpGFX in action on [YouTube](https://www.youtube.com/watch?v=mAJyPSuNsOk).
 - Watch the presentation [CS50x - Final Project](https://www.youtube.com/watch?v=WuQWpn-uma4).
-- Watch [CS50AI - Depth First Search (DFS), Breadth First Search (BFS) - visualization](https://www.youtube.com/watch?v=uZNI1G8OB9M)  
+- Watch [CS50AI - Depth First Search (DFS), Breadth First Search (BFS) - visualization](https://www.youtube.com/watch?v=TB695i2S4FQ)  
   
 [![CS50AI - Depth First Search (DFS), Breadth First Search (BFS) - visualization with AHK and GDI+](https://github.com/user-attachments/assets/8a7e6e00-8329-40dd-a9d8-1d205f45698a)](https://www.youtube.com/watch?v=TB695i2S4FQ)
 
