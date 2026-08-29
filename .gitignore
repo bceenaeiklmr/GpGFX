@@ -1,0 +1,29 @@
+# Ignore temporary and test logs
+*.log
+*.tmp
+Test/log.txt
+Test/ahk_result.txt
+Test/test_out.txt
+tests/*.txt
+tests/*.log
+
+# C/C++ Compiler build artifacts
+*.obj
+*.o
+*.lib
+*.exp
+*.pdb
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.continue/
+.idea/
+
+AGENTS.md
+opencode.json
+
+# Local / Private
+/apps/
+/tests/
