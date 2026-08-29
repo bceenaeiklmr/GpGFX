@@ -27,3 +27,4 @@ opencode.json
 # Local / Private
 /apps/
 /tests/
+/private/
