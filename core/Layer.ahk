@@ -1290,12 +1290,21 @@ class Layer {
     }
 
     /**
-     * Initiates native Win32 window dragging and synchronizes layer coordinates and attached children.
+     * Initiates native Win32 window dragging, or enables draggable mode when chained during setup.
      *
+     * @param {Boolean|Integer|Array|Func} [v] Optional drag setting; enables drag if omitted or at setup
      * @returns {Layer} this
      */
-    Drag() {
+    Drag(v?) {
         local wx, wy
+        if (IsSet(v)) {
+            this.draggable := v
+            return this
+        }
+        if (!GetKeyState("LButton", "P")) {
+            this.draggable := true
+            return this
+        }
         DllCall("user32\ReleaseCapture")
         DllCall("user32\SendMessage", "ptr", this.hwnd, "uint", 0x00A1, "uptr", 2, "ptr", 0)
         if (WinExist(this.hwnd)) {

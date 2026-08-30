@@ -221,26 +221,37 @@ class Dialog {
 
     /**
      * Displays a modern minimalist vector MsgBox with rich text, theme accents, and custom buttons.
-     * @param {String} text - Message description text (supports {color:...} formatting tags)
-     * @param {String} title - Dialog title (default: "GpGFX")
-     * @param {Integer|String|Object} options - Modal options ("YesNo", "OKCancel", "Icon!", { theme: "Nord" }, etc.)
+     * @param {String} [text=""] - Message description text (supports {color:...} formatting tags)
+     * @param {String} [title="GpGFX"] - Dialog title
+     * @param {Integer|String|Object} [options=0] - Modal options ("YesNo", "OKCancel", "IconWarn", etc.)
+     * @param {Object} [config=0] - Configuration object { theme, accent, width, height, buttons, icon }
      * @returns {String} Clicked button: "OK", "Cancel", "Yes", "No"
      */
-    static MsgBox(text := "", title := "GpGFX", options := 0) {
+    static MsgBox(text := "", title := "GpGFX", options := 0, config := 0) {
         local w := 520
         local h := (StrLen(text) > 140) ? 270 : 230
         local btnType := "OK"
         local themeName := Dialog.Theme
         local customAccent := ""
-
         local iconType := ""
+
+        ; If 4th parameter config object is provided, merge it
+        if (IsObject(config)) {
+            themeName := config.HasOwnProp("theme") ? config.theme : themeName
+            customAccent := config.HasOwnProp("accent") ? config.accent : customAccent
+            iconType := config.HasOwnProp("icon") ? config.icon : iconType
+            w := config.HasOwnProp("width") ? config.width : w
+            h := config.HasOwnProp("height") ? config.height : h
+            if (config.HasOwnProp("buttons"))
+                btnType := config.buttons
+        }
 
         ; Parse options (Supports Integer bitmasks, String keywords, and Object configs)
         if (IsObject(options)) {
-            btnType := options.HasOwnProp("buttons") ? options.buttons : "OK"
-            themeName := options.HasOwnProp("theme") ? options.theme : Dialog.Theme
-            customAccent := options.HasOwnProp("accent") ? options.accent : ""
-            iconType := options.HasOwnProp("icon") ? options.icon : ""
+            btnType := options.HasOwnProp("buttons") ? options.buttons : btnType
+            themeName := options.HasOwnProp("theme") ? options.theme : themeName
+            customAccent := options.HasOwnProp("accent") ? options.accent : customAccent
+            iconType := options.HasOwnProp("icon") ? options.icon : iconType
             w := options.HasOwnProp("width") ? options.width : w
             h := options.HasOwnProp("height") ? options.height : h
         } else if (IsInteger(options)) {
@@ -280,19 +291,19 @@ class Dialog {
 
         ; Map icon presets
         local hasIcon := (iconType != "")
-        local iconGlyph := "ℹ", iconClr := 0xFF78DCE8, iconBg := 0x2278DCE8, iconBrd := 0x5578DCE8
+        local iconGlyph := "i", iconClr := 0xFF78DCE8, iconBg := 0x2278DCE8, iconBrd := 0x5578DCE8
         if (hasIcon) {
             switch StrLower(iconType) {
                 case "warn", "warning", "exclamation", "3", "0x30", "48":
                     iconGlyph := "!", iconClr := 0xFFFFD866, iconBg := 0x28FFD866, iconBrd := 0x55FFD866
                 case "err", "error", "stop", "critical", "1", "0x10", "16":
-                    iconGlyph := "✕", iconClr := 0xFFFF6188, iconBg := 0x28FF6188, iconBrd := 0x55FF6188
+                    iconGlyph := "X", iconClr := 0xFFFF6188, iconBg := 0x28FF6188, iconBrd := 0x55FF6188
                 case "question", "?", "2", "0x20", "32":
                     iconGlyph := "?", iconClr := 0xFFAB9DF2, iconBg := 0x28AB9DF2, iconBrd := 0x55AB9DF2
                 case "success", "check", "ok":
-                    iconGlyph := "✓", iconClr := 0xFFA9DC76, iconBg := 0x28A9DC76, iconBrd := 0x55A9DC76
+                    iconGlyph := "V", iconClr := 0xFFA9DC76, iconBg := 0x28A9DC76, iconBrd := 0x55A9DC76
                 default: ; info
-                    iconGlyph := "ℹ", iconClr := 0xFF78DCE8, iconBg := 0x2878DCE8, iconBrd := 0x5578DCE8
+                    iconGlyph := "i", iconClr := 0xFF78DCE8, iconBg := 0x2878DCE8, iconBrd := 0x5578DCE8
             }
         }
 

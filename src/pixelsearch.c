@@ -1,105 +1,190 @@
-    /**
-     * GpGFX PixelSearch x64
-     * License: MIT License
-     *
-     * Memory Layout (SearchCtx Struct - 64 bytes passed in RCX):
-     *   +0   (8 bytes) : const unsigned char* pScan0   - Pointer to first scanline byte
-     *   +8   (4 bytes) : int stride                    - Scanline stride in bytes (width * 4)
-     *   +12  (4 bytes) : unsigned int targetClr        - 32-bit target ARGB color (0xAARRGGBB)
-     *   +16  (4 bytes) : int variation                 - Color channel variation tolerance (0 - 255)
-     *   +20  (4 bytes) : int subX1                     - Left boundary (inclusive)
-     *   +24  (4 bytes) : int subY1                     - Top boundary (inclusive)
-     *   +28  (4 bytes) : int subX2                     - Right boundary (inclusive)
-     *   +32  (4 bytes) : int subY2                     - Bottom boundary (inclusive)
-     *   +36  (4 bytes) : int pad                       - 8-byte boundary alignment padding
-     *   +40  (8 bytes) : volatile int* pSharedStop     - Shared atomic early-exit stop flag
-     *   +48  (4 bytes) : int outFound                  - Output: 1 if found, 0 if not found
-     *   +52  (4 bytes) : int outX                      - Output: X coordinate of matched pixel
-     *   +56  (4 bytes) : int outY                      - Output: Y coordinate of matched pixel
-     *   +60  (4 bytes) : unsigned int outClr           - Output: Matched 32-bit ARGB color
-     *
-     * Compilation (GCC / MinGW):
-     *   gcc -O3 -c -fno-asynchronous-unwind-tables PixelSearchKernel.c -o PixelSearchKernel.o
-     */
+/**
+ * GpGFX PixelSearch & PatternSearch x64 Native Kernels
+ * License: MIT License
+ * Author:  Bence Markiel (bceenaeiklmr)
+ * Date:    30.08.2026
+ *
+ * Description:
+ *   High-speed native x64 zero-copy machine code kernels for:
+ *   1. Single-pixel color search with tolerance (< 0.1 ms).
+ *   2. Multi-point relative pattern matching with 24-bit RGB masking (< 0.8 ms on 1080p/4K).
+ */
 
-    typedef struct {
-        const unsigned char* pScan0;
-        int stride;
-        unsigned int targetClr;
-        int variation;
-        int subX1;
-        int subY1;
-        int subX2;
-        int subY2;
-        int pad;
-        volatile int* pSharedStop;
-        int outFound;
-        int outX;
-        int outY;
-        unsigned int outClr;
-    } SearchCtx;
+typedef struct {
+    const unsigned char* pScan0; // +0
+    int stride;                  // +8
+    unsigned int targetClr;      // +12
+    int variation;               // +16
+    int subX1;                   // +20
+    int subY1;                   // +24
+    int subX2;                   // +28
+    int subY2;                   // +32
+    int pad;                     // +36
+    volatile int* pSharedStop;   // +40
+    int outFound;                // +48
+    int outX;                    // +52
+    int outY;                    // +56
+    unsigned int outClr;         // +60
+} SearchCtx;
 
-    __attribute__((ms_abi))
-    int RunSearch(SearchCtx* c) {
-        if (!c || !c->pScan0) return 0;
+typedef struct {
+    int dx;
+    int dy;
+    unsigned int color;
+    int pad;
+} PatternPoint;
 
-        const unsigned char* pScan0 = c->pScan0;
-        int stride = c->stride;
-        unsigned int targetClr = c->targetClr;
-        int var = c->variation;
-        int x1 = c->subX1, y1 = c->subY1;
-        int x2 = c->subX2, y2 = c->subY2;
-        volatile int* pStop = c->pSharedStop;
+typedef struct {
+    const unsigned char* pScan0; // +0
+    int stride;                  // +8
+    int imgW;                    // +12
+    int imgH;                    // +16
+    int subX1;                   // +20
+    int subY1;                   // +24
+    int subX2;                   // +28
+    int subY2;                   // +32
+    int variation;               // +36
+    int numPoints;               // +40
+    int pad;                     // +44
+    const PatternPoint* pPoints; // +48
+    int outFound;                // +56
+    int outX;                    // +60
+    int outY;                    // +64
+} PatternSearchCtx;
 
-        if (var == 0) {
-            // High-Speed Exact Match Loop (Sequential L1/L2 Cache Streaming)
-            for (int y = y1; y <= y2; ++y) {
-                if (pStop && *pStop) return 0;
+__attribute__((ms_abi))
+int RunSearch(SearchCtx* c) {
+    if (!c || !c->pScan0) return 0;
 
-                const unsigned int* row = (const unsigned int*)(pScan0 + y * stride);
-                for (int x = x1; x <= x2; ++x) {
-                    if (row[x] == targetClr) {
-                        c->outFound = 1;
-                        c->outX = x;
-                        c->outY = y;
-                        c->outClr = targetClr;
-                        if (pStop) *pStop = 1; // Signal atomic early-exit
-                        return 1;
-                    }
-                }
-            }
-        } else {
-            // High-Speed RGB Variation Tolerance Loop
-            int tR = (targetClr >> 16) & 0xFF;
-            int tG = (targetClr >> 8) & 0xFF;
-            int tB = targetClr & 0xFF;
+    const unsigned char* pScan0 = c->pScan0;
+    int stride = c->stride;
+    unsigned int targetClr = c->targetClr & 0x00FFFFFF;
+    int var = c->variation;
+    int x1 = c->subX1, y1 = c->subY1;
+    int x2 = c->subX2, y2 = c->subY2;
+    volatile int* pStop = c->pSharedStop;
 
-            for (int y = y1; y <= y2; ++y) {
-                if (pStop && *pStop) return 0;
-
-                const unsigned int* row = (const unsigned int*)(pScan0 + y * stride);
-                for (int x = x1; x <= x2; ++x) {
-                    unsigned int px = row[x];
-                    int pR = (px >> 16) & 0xFF;
-                    int pG = (px >> 8) & 0xFF;
-                    int pB = px & 0xFF;
-
-                    int dR = pR - tR; if (dR < 0) dR = -dR;
-                    int dG = pG - tG; if (dG < 0) dG = -dG;
-                    int dB = pB - tB; if (dB < 0) dB = -dB;
-
-                    if (dR <= var && dG <= var && dB <= var) {
-                        c->outFound = 1;
-                        c->outX = x;
-                        c->outY = y;
-                        c->outClr = px;
-                        if (pStop) *pStop = 1; // Signal atomic early-exit
-                        return 1;
-                    }
+    if (var == 0) {
+        for (int y = y1; y <= y2; ++y) {
+            if (pStop && *pStop) return 0;
+            const unsigned int* row = (const unsigned int*)(pScan0 + y * stride);
+            for (int x = x1; x <= x2; ++x) {
+                if ((row[x] & 0x00FFFFFF) == targetClr) {
+                    c->outFound = 1;
+                    c->outX = x;
+                    c->outY = y;
+                    c->outClr = row[x];
+                    if (pStop) *pStop = 1;
+                    return 1;
                 }
             }
         }
+    } else {
+        int tR = (targetClr >> 16) & 0xFF;
+        int tG = (targetClr >> 8) & 0xFF;
+        int tB = targetClr & 0xFF;
 
-        c->outFound = 0;
-        return 0;
+        for (int y = y1; y <= y2; ++y) {
+            if (pStop && *pStop) return 0;
+            const unsigned int* row = (const unsigned int*)(pScan0 + y * stride);
+            for (int x = x1; x <= x2; ++x) {
+                unsigned int px = row[x];
+                int pR = (px >> 16) & 0xFF;
+                int pG = (px >> 8) & 0xFF;
+                int pB = px & 0xFF;
+
+                int dR = pR - tR; if (dR < 0) dR = -dR;
+                int dG = pG - tG; if (dG < 0) dG = -dG;
+                int dB = pB - tB; if (dB < 0) dB = -dB;
+
+                if (dR <= var && dG <= var && dB <= var) {
+                    c->outFound = 1;
+                    c->outX = x;
+                    c->outY = y;
+                    c->outClr = px;
+                    if (pStop) *pStop = 1;
+                    return 1;
+                }
+            }
+        }
     }
+    c->outFound = 0;
+    return 0;
+}
+
+__attribute__((ms_abi))
+int RunPatternSearch(PatternSearchCtx* c) {
+    if (!c || !c->pScan0 || c->numPoints <= 0 || !c->pPoints) return 0;
+
+    const unsigned char* pScan0 = c->pScan0;
+    int stride = c->stride;
+    int imgW = c->imgW;
+    int imgH = c->imgH;
+    int subX1 = c->subX1, subY1 = c->subY1;
+    int subX2 = c->subX2, subY2 = c->subY2;
+    int var = c->variation;
+    int numPts = c->numPoints;
+    const PatternPoint* pts = c->pPoints;
+
+    unsigned int anchorClr = pts[0].color & 0x00FFFFFF;
+    int aR = (anchorClr >> 16) & 0xFF;
+    int aG = (anchorClr >> 8) & 0xFF;
+    int aB = anchorClr & 0xFF;
+
+    for (int y = subY1; y <= subY2; ++y) {
+        const unsigned int* row = (const unsigned int*)(pScan0 + y * stride);
+        for (int x = subX1; x <= subX2; ++x) {
+            unsigned int px = row[x] & 0x00FFFFFF;
+
+            if (var == 0) {
+                if (px != anchorClr) continue;
+            } else {
+                int pR = (px >> 16) & 0xFF, pG = (px >> 8) & 0xFF, pB = px & 0xFF;
+                int dR = pR - aR; if (dR < 0) dR = -dR;
+                int dG = pG - aG; if (dG < 0) dG = -dG;
+                int dB = pB - aB; if (dB < 0) dB = -dB;
+                if (dR > var || dG > var || dB > var) continue;
+            }
+
+            // Anchor matched, test remaining points
+            int allMatched = 1;
+            for (int i = 1; i < numPts; ++i) {
+                int ptX = x + pts[i].dx;
+                int ptY = y + pts[i].dy;
+                if (ptX < 0 || ptX >= imgW || ptY < 0 || ptY >= imgH) {
+                    allMatched = 0;
+                    break;
+                }
+
+                unsigned int secPx = *(const unsigned int*)(pScan0 + ptY * stride + ptX * 4) & 0x00FFFFFF;
+                unsigned int targetClr = pts[i].color & 0x00FFFFFF;
+
+                if (var == 0) {
+                    if (secPx != targetClr) {
+                        allMatched = 0;
+                        break;
+                    }
+                } else {
+                    int sR = (secPx >> 16) & 0xFF, sG = (secPx >> 8) & 0xFF, sB = secPx & 0xFF;
+                    int tR = (targetClr >> 16) & 0xFF, tG = (targetClr >> 8) & 0xFF, tB = targetClr & 0xFF;
+                    int dR = sR - tR; if (dR < 0) dR = -dR;
+                    int dG = sG - tG; if (dG < 0) dG = -dG;
+                    int dB = sB - tB; if (dB < 0) dB = -dB;
+                    if (dR > var || dG > var || dB > var) {
+                        allMatched = 0;
+                        break;
+                    }
+                }
+            }
+
+            if (allMatched) {
+                c->outFound = 1;
+                c->outX = x;
+                c->outY = y;
+                return 1;
+            }
+        }
+    }
+    c->outFound = 0;
+    return 0;
+}

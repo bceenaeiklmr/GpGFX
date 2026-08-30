@@ -880,6 +880,96 @@ class GdipBitmap {
      *     MsgBox("Found at (" match.x ", " match.y ") with color " match.hex)
      * }
      */
+    static __pMCodePatternSearch := 0
+
+    /**
+     * Searches for a sparse multi-pixel relative pattern across the bitmap surface in RAM (Native MCode).
+     *
+     * @param {Array} pattern Array of `{dx, dy, argb}` objects or `[dx, dy, argb]` arrays
+     * @param {Integer} [x1=0] Left search boundary
+     * @param {Integer} [y1=0] Top search boundary
+     * @param {Integer} [x2] Right search boundary (defaults to bitmap width - 1)
+     * @param {Integer} [y2] Bottom search boundary (defaults to bitmap height - 1)
+     * @param {Integer} [variation=10] Color channel variation tolerance (0 - 255)
+     * @returns {Object|Boolean} `{ found: true, x: Integer, y: Integer }` or `false`
+     */
+    PatternSearch(pattern, x1 := 0, y1 := 0, x2?, y2?, variation := 10) {
+        local var, bmData, startX, startY, endX, endY, numPts, ptsBuf, ctxBuf, found, fx, fy, idx, pt, off, pDx, pDy, ptClr
+
+        if (!IsObject(pattern) || pattern.Length = 0)
+            return false
+
+        if (!GdipBitmap.__pMCodePatternSearch) {
+            GdipBitmap.__pMCodePatternSearch := MCode(
+                "U1ZXQVRBVUFWQVdVSInlSIPsMEiFyQ+EQAIAAEiJTfhIiwFIhcAPhDACAABEi0" .
+                "EoRYXAD44jAgAATItJME2FyQ+EFgIAAESLYRhIi034RDthIA+P+QEAAEhjQQhJ" .
+                "D6/ESAMBSIlF8ESLaRRIi034RDtpHA+P0AEAAEiLRfBGizSoQYHm////AEyLST" .
+                "BFi3kIQYHn////AItxJIX2dQtFOf4PhZoBAADreESJ8MHoECX/AAAARIn6weoQ" .
+                "geL/AAAAKdCJwsH6HzHQKdA58A+PbgEAAESJ8MHoCCX/AAAARIn6weoIgeL/AA" .
+                "AAKdCJwsH6HzHQKdA58A+PRAEAAESJ8CX/AAAARIn6geL/AAAAKdCJwsH6HzHQ" .
+                "KdA58A+PIAEAAEiLTfiLeSiD/wEPjvYAAAC7AQAAADn7D43pAAAATItJMEiJ2E" .
+                "jB4ARJAcFFiehFAwFFieJFA1EERYXAD4jfAAAARDtBDA+N1QAAAEWF0g+IzAAA" .
+                "AEQ7URAPjcIAAABIY0EISQ+vwkgDAUaLNIBBgeb///8ARYt5CEGB5////wCLcS" .
+                "SF9nUNRTn+D4WRAAAA/8PrgkSJ8MHoECX/AAAARIn6weoQgeL/AAAAKdCJwsH6" .
+                "HzHQKdA58H9nRInwwegIJf8AAABEifrB6giB4v8AAAAp0InCwfofMdAp0Dnwf0" .
+                "FEifAl/wAAAESJ+oHi/wAAACnQicLB+h8x0CnQOfB/If/D6Q////9Ii034x0E4" .
+                "AQAAAESJaTxEiWFAuAEAAADrHUH/xeki/v//Qf/E6fn9//9Ii034x0E4AAAAAD" .
+                "HASIPEMF1BX0FeQV1BXF9eW8M=")
+        }
+
+        var    := Max(0, Min(255, Integer(variation)))
+        numPts := pattern.Length
+
+        ptsBuf := Buffer(numPts * 16, 0)
+        for idx, pt in pattern {
+            off := (idx - 1) * 16
+            if (pt is Array && pt.Length >= 3) {
+                pDx := pt[1], pDy := pt[2], ptClr := pt[3]
+            } else {
+                pDx := pt.HasProp("dx") ? pt.dx : 0
+                pDy := pt.HasProp("dy") ? pt.dy : 0
+                ptClr := pt.HasProp("argb") ? pt.argb : (pt.HasProp("color") ? pt.color : 0xFFFFFFFF)
+            }
+            NumPut("int", pDx, ptsBuf, off + 0)
+            NumPut("int", pDy, ptsBuf, off + 4)
+            NumPut("uint", Color(ptClr), ptsBuf, off + 8)
+        }
+
+        bmData := this.LockBits(0, 0, this.w, this.h, 0x26200A, 1)
+        if (!bmData)
+            return false
+
+        startX := Max(0, Min(this.w - 1, Integer(x1)))
+        startY := Max(0, Min(this.h - 1, Integer(y1)))
+        endX   := IsSet(x2) ? Max(0, Min(this.w - 1, Integer(x2))) : (this.w - 1)
+        endY   := IsSet(y2) ? Max(0, Min(this.h - 1, Integer(y2))) : (this.h - 1)
+
+        ctxBuf := Buffer(72, 0)
+        NumPut("ptr",  bmData.scan0, ctxBuf, 0)
+        NumPut("int",  bmData.stride, ctxBuf, 8)
+        NumPut("int",  this.w,       ctxBuf, 12)
+        NumPut("int",  this.h,       ctxBuf, 16)
+        NumPut("int",  startX,       ctxBuf, 20)
+        NumPut("int",  startY,       ctxBuf, 24)
+        NumPut("int",  endX,         ctxBuf, 28)
+        NumPut("int",  endY,         ctxBuf, 32)
+        NumPut("int",  var,          ctxBuf, 36)
+        NumPut("int",  numPts,       ctxBuf, 40)
+        NumPut("ptr",  ptsBuf.ptr,   ctxBuf, 48)
+
+        DllCall(GdipBitmap.__pMCodePatternSearch, "ptr", ctxBuf.ptr, "int")
+
+        found := NumGet(ctxBuf, 56, "int")
+        fx    := NumGet(ctxBuf, 60, "int")
+        fy    := NumGet(ctxBuf, 64, "int")
+
+        this.UnlockBits(bmData)
+
+        if (found)
+            return {found: true, x: fx, y: fy}
+        return false
+    }
+
     PixelSearch(targetColor, x1 := 0, y1 := 0, x2?, y2?, variation := 0) {
         local target, var, bmData, startX, startY, endX, endY, found, fx, fy, fClr
 
