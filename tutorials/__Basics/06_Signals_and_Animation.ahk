@@ -1,9 +1,7 @@
-; Script     06_Signals_and_Animation.ahk
+; Script:    06_Signals_and_Animation.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; Example:    06_Signals_and_Animation.ahk
 ; Description: Demonstrates reactive Signals for zero-CPU data binding and smooth non-blocking animations.

@@ -1,9 +1,7 @@
-; Script     ColorGrid.ahk
+; Script:    ColorGrid.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 #include ../../GpGFX.ahk
 

@@ -1,9 +1,7 @@
-; Script     04_Typography_and_RichText.ahk
+; Script:    04_Typography_and_RichText.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; Example:    04_Typography_and_RichText.ahk
 ; Description: Demonstrates rich-text inline markup, paragraph word wrapping, and multi-column tab stops.

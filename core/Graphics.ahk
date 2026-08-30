@@ -1,9 +1,7 @@
-; Script     Graphics.ahk
+; Script:    Graphics.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 /**
  * GpGFX GDI+ Graphics Context & 32-bit DIB Surface Manager

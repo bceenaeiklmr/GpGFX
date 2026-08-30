@@ -1,9 +1,8 @@
-; Script     GpGFX.ahk
+; Script:    GpGFX.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
+; Version:   1.1.0
 
 /**
  * GpGFX - 2D Vector Graphics, Layer Composition & Rendering for AutoHotkey v2
@@ -26,7 +25,7 @@
 #DllLoad Gdiplus.dll
 
 class GpGFX {
-    static version := "1.0.0"
+    static version := "1.1.0"
     static debug := true
     static DebugLog(msg) => (GpGFX.debug && OutputDebug(msg))
 }

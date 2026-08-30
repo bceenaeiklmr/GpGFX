@@ -1,18 +1,8 @@
 /**
- * GpGFX Native MCode - Batch Vectorized 2D Bounding Box Calculator
- * Author: Bence Markiel (bceenaeiklmr)
- * License: MIT License
- *
- * Description:
- *   Computes the axis-aligned bounding box [minX, minY, maxX, maxY] across an array
- *   of N 2D single-precision float points (x, y) in a single vectorized pass.
- *
- * Signature:
- *   void BatchComputeBounds(const float *pPoints, int count, float *pOut);
- *
- * Memory Layout:
- *   pPoints: [x0, y0, x1, y1, x2, y2, ...] (count * 8 bytes)
- *   pOut:    [minX, minY, maxX, maxY] (16 bytes)
+ * File:     bounds.c
+ * License:  MIT License
+ * Author:   Bence Markiel (bceenaeiklmr)
+ * Github:   https://github.com/bceenaeiklmr/GpGFX
  */
 
 void BatchComputeBounds(const float *pPoints, int count, float *pOut) {

@@ -1,9 +1,7 @@
-; Script     02_Basic_Shapes.ahk
+; Script:    02_Basic_Shapes.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; Example:    02_Basic_Shapes.ahk
 ; Description: Demonstrates core vector shape primitives (Rectangles, Circles, Triangles, Lines, Beziers).

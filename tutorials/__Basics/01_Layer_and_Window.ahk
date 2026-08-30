@@ -1,9 +1,7 @@
-; Script     01_Layer_and_Window.ahk
+; Script:    01_Layer_and_Window.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; Example:    01_Layer_and_Window.ahk
 ; Description: How to create a transparent, hardware-accelerated GpGFX layered window.

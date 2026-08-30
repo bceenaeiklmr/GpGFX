@@ -1,17 +1,8 @@
 /**
- * GpGFX Native MCode - Batch Vectorized 2D Point Translation Kernel
- * Author: Bence Markiel (bceenaeiklmr)
- * License: MIT License
- *
- * Description:
- *   Applies an in-place [x += dx, y += dy] translation across an array of N 2D
- *   single-precision float points (x, y) directly in memory.
- *
- * Signature:
- *   void BatchTranslate(float *pPoints, int count, float dx, float dy);
- *
- * Memory Layout:
- *   pPoints: [x0, y0, x1, y1, x2, y2, ...] (count * 8 bytes)
+ * File:     translate.c
+ * License:  MIT License
+ * Author:   Bence Markiel (bceenaeiklmr)
+ * Github:   https://github.com/bceenaeiklmr/GpGFX
  */
 
 void BatchTranslate(float *pPoints, int count, float dx, float dy) {

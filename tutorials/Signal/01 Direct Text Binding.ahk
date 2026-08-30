@@ -1,9 +1,7 @@
-; Script     01 Direct Text Binding.ahk
+; Script:    01 Direct Text Binding.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; file: Direct Text Binding (Auto-Updating Text)
 

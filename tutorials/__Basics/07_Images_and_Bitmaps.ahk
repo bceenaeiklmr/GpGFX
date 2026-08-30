@@ -1,9 +1,7 @@
-; Script     07_Images_and_Bitmaps.ahk
+; Script:    07_Images_and_Bitmaps.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; Example:    07_Images_and_Bitmaps.ahk
 ; Description: Demonstrates image rendering, color matrix filters (Grayscale, Invert), and pixel manipulation.

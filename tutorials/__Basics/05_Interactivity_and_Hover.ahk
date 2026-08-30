@@ -1,9 +1,7 @@
-; Script     05_Interactivity_and_Hover.ahk
+; Script:    05_Interactivity_and_Hover.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 ; Example:    05_Interactivity_and_Hover.ahk
 ; Description: Demonstrates interactive mouse events, hover color feedback, and custom vector buttons.

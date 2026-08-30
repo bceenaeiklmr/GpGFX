@@ -1,3 +1,10 @@
+/**
+ * File:     throttle.c
+ * License:  MIT License
+ * Author:   Bence Markiel (bceenaeiklmr)
+ * Github:   https://github.com/bceenaeiklmr/GpGFX
+ */
+
 ﻿/**
  * GpGFX.Core - Native Frame Throttle & Pacing Engine
  * Author: Bence Markiel (bceenaeiklmr)

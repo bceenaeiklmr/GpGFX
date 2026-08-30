@@ -1,13 +1,8 @@
 /**
- * GpGFX PixelSearch & PatternSearch x64 Native Kernels
- * License: MIT License
- * Author:  Bence Markiel (bceenaeiklmr)
- * Date:    30.08.2026
- *
- * Description:
- *   High-speed native x64 zero-copy machine code kernels for:
- *   1. Single-pixel color search with tolerance (< 0.1 ms).
- *   2. Multi-point relative pattern matching with 24-bit RGB masking (< 0.8 ms on 1080p/4K).
+ * File:     pixelsearch.c
+ * License:  MIT License
+ * Author:   Bence Markiel (bceenaeiklmr)
+ * Github:   https://github.com/bceenaeiklmr/GpGFX
  */
 
 typedef struct {

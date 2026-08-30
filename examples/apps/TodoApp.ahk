@@ -1,9 +1,7 @@
-; Script     TodoApp.ahk
+; Script:    TodoApp.ahk
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Date       29.08.2026
-; Version    1.0.0
 
 #Requires AutoHotkey v2
 #include ../../GpGFX.ahk
