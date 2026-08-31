@@ -92,7 +92,7 @@ Draw(lyr) {
     for v in lyr.drawSequence {
 
         ; Direct bypass for invisible dummy shapes without text or bitmap
-        if (v.shape == "Dummy" && (v.str == "" || v.str == 0) && (!v.Bitmap || !v.Bitmap.ptr))
+        if (v.shape == "Dummy" && (String(v.str) == "") && (!v.Bitmap || !v.Bitmap.ptr))
             continue
 
         ; Get reference to the shape's tool (Brush, Pen, or raw pointer)
@@ -420,7 +420,7 @@ Draw(lyr) {
         }
 
         ; 1.6 TYPOGRAPHIC RICH TEXT & EMOJI RENDERING
-        if (v.str !== "" && v.str !== 0) {
+        if (String(v.str) !== "") {
             if (!IsObject(v.Font) || !v.Font.HasProp("hFont") || !v.Font.hFont) {
                 v.Font := Font.getStock()
             }

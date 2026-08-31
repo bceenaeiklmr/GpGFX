@@ -34,7 +34,7 @@ class TextLayout {
     static Prepare(shape) {
         local val, rawSegments, seg, strRaw, defaultClr, currentClr, currentStyle, baseStyle, baseFnt, runFont, pos, textLen, strInput, tagPos, chunk, closeBrace, tagContent, clrSpec, m, matchedClr, mTag, mClr, parts, part, foundAny
 
-        if (shape.__str == "" || shape.__str == 0) {
+        if (String(shape.__str) == "") {
             shape.__isRichText := false
             shape.__textRuns := []
             shape.__textLines := []

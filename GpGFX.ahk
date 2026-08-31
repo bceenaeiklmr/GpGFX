@@ -2,7 +2,7 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-; Version:   1.0.1
+; Version:   1.0.2
 
 /**
  * GpGFX - 2D Vector Graphics, Layer Composition & Rendering for AutoHotkey v2
@@ -25,7 +25,7 @@
 #DllLoad Gdiplus.dll
 
 class GpGFX {
-    static version := "1.0.1"
+    static version := "1.0.2"
     static debug := true
     static DebugLog(msg) => (GpGFX.debug && OutputDebug(msg))
 }
