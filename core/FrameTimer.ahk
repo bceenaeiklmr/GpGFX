@@ -35,6 +35,15 @@ class FrameTimer {
     static pAck := 0
     static pStats := 0
 
+    ; Fallback telemetry
+    static __fallbackLastQpc := 0
+    static __fallbackQpf := 0
+    static __fallbackDeltaMs := 0.0
+    static __fallbackAvgFps := 0.0
+    static __fallbackTotalFrames := 0
+    static __fallbackFrameCount := 0
+    static __fallbackAccumTime := 0.0
+
     /**
      * Initializes and loads GpGFX.Core.dll if available.
      * Searches root, native/bin/, and script directory.
@@ -49,7 +58,9 @@ class FrameTimer {
 
         dllPaths := [
             A_LineFile "\..\GpGFX.Core.dll",
+            A_LineFile "\..\..\GpGFX.Core.dll",
             A_LineFile "\..\native\bin\GpGFX.Core.dll",
+            A_LineFile "\..\..\native\bin\GpGFX.Core.dll",
             A_WorkingDir "\GpGFX.Core.dll",
             A_WorkingDir "\native\bin\GpGFX.Core.dll"
         ]
@@ -111,7 +122,7 @@ class FrameTimer {
      * FrameTimer.Start(UpdateGame, 144.0)
      */
     static Start(target, fps := 60.0, autoMode := 1) {
-        local success, interval
+        local success, interval, qpf := 0
 
         this.fps := fps
         this.autoMode := autoMode
@@ -144,6 +155,15 @@ class FrameTimer {
 
         ; Fallback: Pure AHK timer loop if native DLL is not present
         this.isRunning := true
+        this.__fallbackLastQpc := 0
+        this.__fallbackDeltaMs := 0.0
+        this.__fallbackAvgFps := 0.0
+        this.__fallbackTotalFrames := 0
+        this.__fallbackFrameCount := 0
+        this.__fallbackAccumTime := 0.0
+        DllCall("QueryPerformanceFrequency", "int64*", &qpf:=0)
+        this.__fallbackQpf := qpf
+
         interval := Max(1, Floor(1000.0 / fps))
         SetTimer(ObjBindMethod(this, "__FallbackTick"), interval)
         return true
@@ -190,7 +210,7 @@ class FrameTimer {
     }
 
     /**
-     * Retrieves live frame pacing statistics from the native thread.
+     * Retrieves live frame pacing statistics from the native thread or fallback timer.
      *
      * @returns {Object} { lastDeltaMs: Float, avgFps: Float, totalFrames: Integer }
      *
@@ -205,7 +225,11 @@ class FrameTimer {
                 DllCall(this.pStats, "double*", &lastDelta:=0, "double*", &avgFps:=0, "uint64*", &totalFrames:=0)
                 return { lastDeltaMs: lastDelta, avgFps: avgFps, totalFrames: totalFrames }
             }
-            return {lastDeltaMs: 1000.0 / Max(1, this.fps), avgFps: this.fps, totalFrames: 0}
+            return {
+                lastDeltaMs: (this.__fallbackDeltaMs > 0.0 ? this.__fallbackDeltaMs : 1000.0 / Max(1, this.fps)),
+                avgFps: (this.__fallbackAvgFps > 0.0 ? this.__fallbackAvgFps : this.fps),
+                totalFrames: this.__fallbackTotalFrames
+            }
         }
     }
 
@@ -238,10 +262,25 @@ class FrameTimer {
      * Internal fallback tick when native DLL is not loaded.
      */
     static __FallbackTick() {
-        local lyr, fn
+        local lyr, fn, now := 0, deltaMs := 0.0
 
         if (!this.isRunning)
             return
+
+        DllCall("QueryPerformanceCounter", "int64*", &now:=0)
+        if (this.__fallbackLastQpc > 0 && this.__fallbackQpf > 0) {
+            deltaMs := (now - this.__fallbackLastQpc) / this.__fallbackQpf * 1000.0
+            this.__fallbackDeltaMs := deltaMs
+            this.__fallbackTotalFrames++
+            this.__fallbackFrameCount++
+            this.__fallbackAccumTime += deltaMs
+            if (this.__fallbackAccumTime >= 500.0) {
+                this.__fallbackAvgFps := (this.__fallbackFrameCount / this.__fallbackAccumTime) * 1000.0
+                this.__fallbackFrameCount := 0
+                this.__fallbackAccumTime := 0.0
+            }
+        }
+        this.__fallbackLastQpc := now
 
         if (this.callback) {
             fn := this.callback

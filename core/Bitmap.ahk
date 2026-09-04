@@ -1040,7 +1040,7 @@ class GdipBitmap {
      * bmp.SaveToFile("photo.jpg", "JPEG", 85)
      */
     SaveToFile(filepath, format := "", quality := 100) {
-        local ext := "", clsid, status
+        local ext := "", clsid, encParams, status
         if (!this.ptr)
             return false
         if (format == "") {
@@ -1048,7 +1048,8 @@ class GdipBitmap {
             format := (ext != "") ? ext : "PNG"
         }
         clsid := GdipBitmap.GetEncoderClsid(format)
-        status := DllCall("gdiplus\GdipSaveImageToFile", "ptr", this.ptr, "wstr", filepath, "ptr", clsid, "ptr", 0)
+        encParams := GdipBitmap.GetEncoderParams(format, quality)
+        status := DllCall("gdiplus\GdipSaveImageToFile", "ptr", this.ptr, "wstr", filepath, "ptr", clsid, "ptr", encParams)
         return (status == 0)
     }
 
@@ -1068,7 +1069,7 @@ class GdipBitmap {
      * FileOpen("saved.png", "w").RawWrite(pngBuf)
      */
     ToMemory(format := "PNG", quality := 100) {
-        local pStream := 0, hGlobal := 0, pMem, size, outBuf, clsid
+        local pStream := 0, hGlobal := 0, pMem, size, outBuf, clsid, encParams
         if (!this.ptr)
             return 0
 
@@ -1081,8 +1082,9 @@ class GdipBitmap {
             ObjRelease(pStream)
             return 0
         }
+        encParams := GdipBitmap.GetEncoderParams(format, quality)
 
-        DllCall("gdiplus\GdipSaveImageToStream", "ptr", this.ptr, "ptr", pStream, "ptr", clsid, "ptr", 0)
+        DllCall("gdiplus\GdipSaveImageToStream", "ptr", this.ptr, "ptr", pStream, "ptr", clsid, "ptr", encParams)
 
         hGlobal := 0
         DllCall("ole32\GetHGlobalFromStream", "ptr", pStream, "ptr*", &hGlobal:=0)
@@ -1283,6 +1285,71 @@ class GdipBitmap {
     }
 
     /**
+     * Packs an EncoderParameters struct buffer for JPEG compression quality.
+     * Returns 0 for non-JPEG formats where quality parameters are not applicable.
+     *
+     * @param {String} [format="PNG"] Image format name ("JPEG", "JPG", "PNG", etc.)
+     * @param {Integer} [quality=100] JPEG compression quality (0 - 100)
+     * @returns {Buffer|Integer} Packed EncoderParameters buffer or 0
+     */
+    static GetEncoderParams(format := "PNG", quality := 100) {
+        local fmt, guidOffset, valOffset, buf, q
+        fmt := StrUpper(format)
+        if (fmt != "JPEG" && fmt != "JPG")
+            return 0
+        guidOffset := A_PtrSize
+        valOffset := guidOffset + 24 + A_PtrSize
+        buf := Buffer(valOffset + 8, 0)
+        NumPut("uint", 1, buf, 0) ; Count = 1
+        DllCall("ole32\CLSIDFromString", "wstr", "{1D5BE4B5-FA4A-452D-9CDD-5DB35105E7EB}", "ptr", buf.ptr + guidOffset) ; EncoderQuality GUID
+        NumPut("uint", 1, buf, guidOffset + 16) ; NumberOfValues = 1
+        NumPut("uint", 4, buf, guidOffset + 20) ; Type = 4 (EncoderParameterValueTypeLong)
+        q := (quality < 0) ? 0 : (quality > 100) ? 100 : Integer(quality)
+        NumPut("uint", q, buf, valOffset) ; Quality value
+        NumPut("ptr", buf.ptr + valOffset, buf, guidOffset + 24) ; Value pointer
+        return buf
+    }
+
+    /**
+     * Pre-compiles this bitmap into a high-speed GDI+ CachedBitmap targeted to a Graphics context or Layer.
+     * Pre-rendering converts pixel data to the native format of the display device (~2x-3x faster blitting).
+     *
+     * @param {Graphics|Layer|Ptr} gfx Target Graphics context, Layer, or native pGraphics pointer
+     * @returns {CachedBitmap}
+     *
+     * @example
+     * cached := bmp.GetCached(myLayer)
+     * cached.Draw(myLayer, 100, 100)
+     */
+    GetCached(gfx) => CachedBitmap(this, gfx)
+
+    /**
+     * Draws this bitmap onto the target graphics surface.
+     *
+     * @param {Graphics|Layer|Ptr} gfx Target Graphics context, Layer, or native pGraphics pointer
+     * @param {Integer} [x=0] Destination X
+     * @param {Integer} [y=0] Destination Y
+     * @param {Integer} [w] Destination Width (defaults to native width)
+     * @param {Integer} [h] Destination Height (defaults to native height)
+     * @returns {Integer} GDI+ status code (0 = success)
+     */
+    Draw(gfx, x := 0, y := 0, w?, h?) {
+        local pGfx, dstW, dstH
+        pGfx := (IsObject(gfx)) ? ((gfx is Layer) ? gfx.gfx.ptr : (gfx.ptr || gfx)) : gfx
+        dstW := IsSet(w) ? w : this.w
+        dstH := IsSet(h) ? h : this.h
+        if (!this.ptr || !pGfx)
+            return 2
+        if (IsSet(w) || IsSet(h)) {
+            return DllCall("gdiplus\GdipDrawImageRectRectI", "ptr", pGfx, "ptr", this.ptr
+                , "int", Round(x), "int", Round(y), "int", Round(dstW), "int", Round(dstH)
+                , "int", 0, "int", 0, "int", this.w, "int", this.h
+                , "int", 2, "ptr", 0, "ptr", 0, "ptr", 0)
+        }
+        return DllCall("gdiplus\GdipDrawImage", "ptr", pGfx, "ptr", this.ptr, "float", Float(x), "float", Float(y))
+    }
+
+    /**
      * Releases the native GDI+ bitmap handle and frees its memory.
      *
      * @returns {void}
@@ -1367,7 +1434,9 @@ class CachedBitmap {
         if (this.ptr) {
             local p := this.ptr
             this.ptr := 0
-            DllCall("gdiplus\GdipDeleteCachedBitmap", "ptr", p)
+            if (Gdip.pToken) {
+                try DllCall("gdiplus\GdipDeleteCachedBitmap", "ptr", p)
+            }
         }
     }
 

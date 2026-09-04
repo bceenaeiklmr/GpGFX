@@ -517,6 +517,124 @@ class Layer {
     }
 
     /**
+     * Sets the layer transparency alpha and immediately synchronizes DWM window alpha.
+     *
+     * @param {Integer|Float|String} val Alpha value (0-255, 0.0-1.0, or "50%")
+     * @returns {Layer} this (for chaining)
+     */
+    SetAlpha(val) {
+        this.Alpha := val
+        if (this.hwnd && DllCall("user32\IsWindow", "ptr", this.hwnd) && this.gfx && this.gfx.hdc) {
+            local dstX := Integer(this.x), dstY := Integer(this.y)
+            local winW := Max(1, Integer(this.w)), winH := Max(1, Integer(this.h))
+            DllCall("UpdateLayeredWindow"
+                ,     "ptr", this.hwnd
+                ,     "ptr", 0
+                , "uint64*", (dstX & 0xFFFFFFFF) | ((dstY & 0xFFFFFFFF) << 32)
+                , "uint64*", (winW & 0xFFFFFFFF) | ((winH & 0xFFFFFFFF) << 32)
+                ,     "ptr", this.gfx.hdc
+                , "uint64*", 0
+                ,    "uint", 0
+                ,   "uint*", (this.__alpha << 16) | 0x01000000
+                ,    "uint", 2)
+        }
+        return this
+    }
+
+    /**
+     * Flushes the current graphics DC buffer directly to the screen via UpdateLayeredWindow
+     * without re-evaluating shape layouts. Ideal for custom blitting loops or CachedBitmap rendering.
+     *
+     * @returns {Layer} this
+     */
+    UpdateWindow() {
+        if (this.hwnd && DllCall("user32\IsWindow", "ptr", this.hwnd) && this.gfx && this.gfx.hdc) {
+            local dstX := Integer(this.x), dstY := Integer(this.y)
+            local winW := Max(1, Integer(this.w)), winH := Max(1, Integer(this.h))
+            DllCall("UpdateLayeredWindow"
+                ,     "ptr", this.hwnd
+                ,     "ptr", 0
+                , "uint64*", (dstX & 0xFFFFFFFF) | ((dstY & 0xFFFFFFFF) << 32)
+                , "uint64*", (winW & 0xFFFFFFFF) | ((winH & 0xFFFFFFFF) << 32)
+                ,     "ptr", this.gfx.hdc
+                , "uint64*", 0
+                ,    "uint", 0
+                ,   "uint*", (this.__alpha << 16) | 0x01000000
+                ,    "uint", 2)
+        }
+        return this
+    }
+
+    /**
+     * Smoothly fades in the entire layer from current alpha to targetAlpha.
+     * Uses hardware-accelerated Win32 UpdateLayeredWindow DWM blend updates.
+     *
+     * @param {Integer} [durationMs=300] Duration in milliseconds
+     * @param {Integer} [targetAlpha=255] Target alpha (0-255)
+     * @param {Function} [onDone] Optional callback when animation completes
+     * @returns {Layer} this (for chaining)
+     */
+    FadeIn(durationMs := 300, targetAlpha := 255, onDone?) {
+        local self := this
+        local startTick := A_TickCount
+        local fromAlpha := self.Alpha
+
+        if (fromAlpha == 0)
+            self.Show()
+
+        __Tick() {
+            local elapsed := A_TickCount - startTick
+            local progress := durationMs > 0 ? Min(1.0, elapsed / durationMs) : 1.0
+            local easeOut := 1.0 - ((1.0 - progress) * (1.0 - progress))
+            local curAlpha := Round(fromAlpha + (targetAlpha - fromAlpha) * easeOut)
+            self.SetAlpha(curAlpha)
+
+            if (progress >= 1.0) {
+                SetTimer(, 0)
+                self.SetAlpha(targetAlpha)
+                if (IsSet(onDone) && IsObject(onDone))
+                    (onDone)(self)
+            }
+        }
+
+        SetTimer(__Tick, 16)
+        return self
+    }
+
+    /**
+     * Smoothly fades out the entire layer from current alpha to 0 and hides it.
+     * Uses hardware-accelerated Win32 UpdateLayeredWindow DWM blend updates.
+     *
+     * @param {Integer} [durationMs=300] Duration in milliseconds
+     * @param {Function} [onDone] Optional callback when animation completes
+     * @returns {Layer} this (for chaining)
+     */
+    FadeOut(durationMs := 300, onDone?) {
+        local self := this
+        local startTick := A_TickCount
+        local fromAlpha := self.Alpha
+
+        __Tick() {
+            local elapsed := A_TickCount - startTick
+            local progress := durationMs > 0 ? Min(1.0, elapsed / durationMs) : 1.0
+            local easeIn := progress * progress
+            local curAlpha := Round(fromAlpha - (fromAlpha * easeIn))
+            self.SetAlpha(curAlpha)
+
+            if (progress >= 1.0) {
+                SetTimer(, 0)
+                self.SetAlpha(0)
+                self.Hide()
+                if (IsSet(onDone) && IsObject(onDone))
+                    (onDone)(self)
+            }
+        }
+
+        SetTimer(__Tick, 16)
+        return self
+    }
+
+    /**
      * Multi-core background worker execution mode.
      * When true, assigns a dedicated CPU worker process via WorkerPool.
      * @type {Boolean}
@@ -683,7 +801,7 @@ class Layer {
      *   - Omitted: Single immediate render.
      *   - Negative Integer: Immediate render + auto-destroy after `Abs(trigger)` ms (e.g. `lyr.Draw(-1500)` -> 1.5s Toast).
      *   - Positive Integer: Recurring interval loop in ms (e.g. `lyr.Draw(1000, updateFn)` -> Clock).
-     *   - Signal: Reactive data binding — auto-redraws whenever the signal changes value.
+     *   - Signal: Reactive data binding: auto-redraws whenever the signal changes value.
      *   - 0 or False: Stops any active recurring loop on this layer.
      * @param {Function} [updateFn] Optional callback executed before each frame render:
      *   - For interval loops: `fn(layer)`
@@ -1807,6 +1925,50 @@ class Layer {
     }
 
     /**
+     * Moves a shape to the front of this layer's Z-order (rendered on top of all other shapes).
+     *
+     * @param {Shape} shapeObj Shape instance to move
+     * @returns {Layer} this
+     */
+    BringToFront(shapeObj) {
+        loop this.shapes.Length {
+            if (this.shapes[A_Index] == shapeObj) {
+                if (A_Index < this.shapes.Length) {
+                    this.shapes.RemoveAt(A_Index)
+                    this.shapes.Push(shapeObj)
+                    this.isDirtyBounds := true
+                    if (this.Redraw)
+                        Draw(this)
+                }
+                break
+            }
+        }
+        return this
+    }
+
+    /**
+     * Moves a shape to the back of this layer's Z-order (rendered behind all other shapes).
+     *
+     * @param {Shape} shapeObj Shape instance to move
+     * @returns {Layer} this
+     */
+    SendToBack(shapeObj) {
+        loop this.shapes.Length {
+            if (this.shapes[A_Index] == shapeObj) {
+                if (A_Index > 1) {
+                    this.shapes.RemoveAt(A_Index)
+                    this.shapes.InsertAt(1, shapeObj)
+                    this.isDirtyBounds := true
+                    if (this.Redraw)
+                        Draw(this)
+                }
+                break
+            }
+        }
+        return this
+    }
+
+    /**
      * Disposes and deletes all registered shapes on this layer.
      *
      * @returns {void}
@@ -1915,15 +2077,67 @@ class Layer {
     }
 
     /**
+     * Clones the current rendered Layer into a new GdipBitmap instance.
+     * Preserves full 32-bit ARGB transparency directly from the memory buffer.
+     *
+     * @param {Boolean} [cropToContent=false] If true, crops bitmap to drawn shape bounding box
+     * @returns {GdipBitmap|Integer} GdipBitmap instance on success, 0 on failure
+     */
+    ToBitmap(cropToContent := false) {
+        local pBitmap := 0, pCropped := 0, stride, pFinal, w, h
+        if (!this.gfx || !this.gfx.ptr || !this.gfx.pBits)
+            return 0
+
+        DllCall("gdiplus\GdipFlush", "ptr", this.gfx.ptr, "int", 1)
+        stride := this.gfx.w * 4
+        DllCall("gdiplus\GdipCreateBitmapFromScan0"
+            , "int", this.gfx.w
+            , "int", this.gfx.h
+            , "int", stride
+            , "int", 0x26200A
+            , "ptr", this.gfx.pBits
+            , "ptr*", &pBitmap:=0)
+
+        if (!pBitmap)
+            return 0
+
+        pFinal := pBitmap
+        w := this.gfx.w
+        h := this.gfx.h
+
+        if (cropToContent && this.width > 0 && this.height > 0 && (this.width < this.gfx.w || this.height < this.gfx.h)) {
+            if (DllCall("gdiplus\GdipCloneBitmapAreaI", "int", this.x1, "int", this.y1, "int", this.width, "int", this.height, "int", 0x26200A, "ptr", pBitmap, "ptr*", &pCropped:=0) == 0 && pCropped) {
+                pFinal := pCropped
+                w := this.width
+                h := this.height
+                DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+            }
+        } else {
+            local pCloned := 0
+            if (DllCall("gdiplus\GdipCloneImage", "ptr", pBitmap, "ptr*", &pCloned:=0) == 0 && pCloned) {
+                DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+                pFinal := pCloned
+            }
+        }
+
+        local bmpObj := { base: GdipBitmap.Prototype }
+        bmpObj.ptr := pFinal
+        bmpObj.w := w
+        bmpObj.h := h
+        return bmpObj
+    }
+
+    /**
      * Exports the layer to an image file (PNG, JPG, BMP, GIF, TIFF).
      * Preserves full 32-bit ARGB transparency from the DIBSection memory buffer.
      *
-     * @param {String} filepath Destination file path
+     * @param {String}  filepath Destination file path (e.g. "screenshot.png", "image.jpg")
      * @param {Boolean} [cropToContent=true] Crop to drawn shape bounding box
+     * @param {Integer} [quality=100] JPEG compression quality (0 - 100)
      * @returns {Boolean} True on success
      */
-    toFile(filepath, cropToContent := true) {
-        local pBitmap := 0, pCropped := 0, pCodec, ext, clsid, finalBitmap, result, stride, m
+    ToFile(filepath, cropToContent := true, quality := 100) {
+        local pBitmap := 0, pCropped := 0, ext := "", clsid, encParams, finalBitmap, result, stride
 
         if (!this.gfx || !this.gfx.ptr || !this.gfx.pBits)
             return false
@@ -1948,20 +2162,10 @@ class Layer {
             }
         }
 
-        clsid := "{557CF406-1A04-11D3-9A73-0000F81EF32E}" ; default PNG
-        if (RegExMatch(filepath, "i)\.([a-z0-9]+)$", &m)) {
-            switch StrLower(m[1]) {
-                case "bmp", "dib": clsid := "{557CF400-1A04-11D3-9A73-0000F81EF32E}"
-                case "jpg", "jpeg", "jpe", "jfif": clsid := "{557CF401-1A04-11D3-9A73-0000F81EF32E}"
-                case "gif": clsid := "{557CF402-1A04-11D3-9A73-0000F81EF32E}"
-                case "tif", "tiff": clsid := "{557CF405-1A04-11D3-9A73-0000F81EF32E}"
-                case "png": clsid := "{557CF406-1A04-11D3-9A73-0000F81EF32E}"
-            }
-        }
-
-        pCodec := Buffer(16)
-        DllCall("ole32\CLSIDFromString", "wstr", clsid, "ptr", pCodec, "hresult")
-        result := DllCall("gdiplus\GdipSaveImageToFile", "ptr", finalBitmap, "wstr", filepath, "ptr", pCodec, "ptr", 0)
+        SplitPath(filepath, , , &ext)
+        clsid := GdipBitmap.GetEncoderClsid((ext != "") ? ext : "PNG")
+        encParams := GdipBitmap.GetEncoderParams(ext, quality)
+        result := DllCall("gdiplus\GdipSaveImageToFile", "ptr", finalBitmap, "wstr", filepath, "ptr", clsid, "ptr", encParams)
 
         if (pCropped)
             DllCall("gdiplus\GdipDisposeImage", "ptr", pCropped)

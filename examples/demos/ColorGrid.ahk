@@ -34,6 +34,8 @@ TestColorTransition() {
     changes := 3
     distmax := 100
 
+    Fps.SetTarget(60)
+
     loop changes {
         loop distmax {
             dist := A_Index
@@ -43,8 +45,7 @@ TestColorTransition() {
                 rect[A_Index].color := Color.Transition(clr[A_Index][1], clr[A_Index][2], dist)
                 rect[A_Index].str := "Rect " A_Index "`n`n`n" intToARGB(ARGB1) "`n`n" intToARGB(ARGB2) "`n`n`nindex " dist
             }
-            Draw(lyr)
-            Sleep(10)
+            Render.Layer(lyr)
         }
         ; Swap next color
         loop rect.length {

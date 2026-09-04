@@ -164,8 +164,22 @@ class Fps {
      * Fps.Position("topright", A_ScreenWidth - 250, 40)
      */
     static Position(pos := "topRight", x?, y?) {
-        if (pos is Integer)
-            pos := PositionByNumber(pos)
+        if (!this.Layer)
+            return
+        if (pos is Integer) {
+            switch pos {
+                case 7: pos := "topleft"
+                case 8: pos := "topcenter"
+                case 9: pos := "topright"
+                case 4: pos := "middleleft"
+                case 5: pos := "middlecenter"
+                case 6: pos := "middleright"
+                case 1: pos := "bottomleft"
+                case 2: pos := "bottomcenter"
+                case 3: pos := "bottomright"
+                default: pos := "topcenter"
+            }
+        }
         if (pos is String)
             pos := StrLower(pos)
 

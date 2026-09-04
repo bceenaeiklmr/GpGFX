@@ -49,23 +49,23 @@ btn_OnClick(shp?, mx?, my?) {
 
     ; Change button color and text
     btn.color := "Lime"
-    btn.Text("✓", "Black", 20)
+    btn.Text("OK", "Black", 20)
     
-    ; Create a color transition from red to lime
+    ; Create a color transition
     clr := Color.GetTransition(status.color, "3d5eca")
     status.Text("Clicked!", "Black", 20)
     
+    ; Setup 60 FPS pacing
+    Fps.SetTarget(60)
+
     ; Apply the color transition to the status rectangle
     loop clr.length {
         status.color := clr[A_Index]
-        Draw(main)
-        Sleep(20)
+        Render.Layer(main)
     }
     
-    ; Update the status text
-    
-    Draw(main)
-    Sleep(1000)
+    ; Pause before closing
+    Time.Delay(1000)
     
     ; End the script
     End(1)

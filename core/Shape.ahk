@@ -494,6 +494,36 @@ class Shape {
     }
 
     /**
+     * Gets the right geometric edge of the shape (x + w).
+     * @type {Integer}
+     */
+    Right => (this.x + this.w)
+
+    /**
+     * Gets the bottom geometric edge of the shape (y + h).
+     * @type {Integer}
+     */
+    Bottom => (this.y + this.h)
+
+    /**
+     * Gets the horizontal center coordinate of the shape (x + w / 2).
+     * @type {Float}
+     */
+    CenterX => (this.x + (this.w / 2))
+
+    /**
+     * Gets the vertical center coordinate of the shape (y + h / 2).
+     * @type {Float}
+     */
+    CenterY => (this.y + (this.h / 2))
+
+    /**
+     * Gets the bounding rectangle of the shape as a coordinate object {x, y, w, h}.
+     * @type {Object}
+     */
+    Bounds => { x: this.x, y: this.y, w: this.w, h: this.h }
+
+    /**
      * Sets or gets the visibility state of the shape.
      * @type {Boolean}
      */
@@ -1137,6 +1167,7 @@ class Shape {
         } else
             throw Error('Position coordinates must be integer, float, or "center".')
         layerObj := ""
+        return this
     }
 
     /**

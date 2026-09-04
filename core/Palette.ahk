@@ -232,11 +232,17 @@ class PaletteInstance {
         }
     }
 
-    ; Semantic role getters
+    ; Semantic role and compatibility aliases
+    fg        => this.text
+    bgAlt     => this.surface
     primary   => this.colors[1]
     accent    => (this.colors.Length >= 2) ? this.colors[2] : this.colors[1]
     highlight => (this.colors.Length >= 3) ? this.colors[3] : this.accent
     secondary => (this.colors.Length >= 4) ? this.colors[4] : this.accent
+    danger    => (this.colors.Length >= 4) ? this.colors[4] : this.highlight
+    success   => (this.colors.Length >= 3) ? this.colors[3] : this.accent
+    warning   => this.accent2
+    swatches  => this.colors
 
     /**
      * Samples a color from the pre-computed gradient lookup table in ~2 nanoseconds.

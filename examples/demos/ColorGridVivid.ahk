@@ -26,6 +26,8 @@ TestColorChangeVivid(row := 1, col := 1) {
     changes := 3
     distmax := 100
 
+    Fps.SetTarget(60)
+
     ; Main loop
     loop changes {
         loop distmax {
@@ -33,8 +35,7 @@ TestColorChangeVivid(row := 1, col := 1) {
             loop rect.Length {
                 rect[A_Index].Color := Clr[A_Index][disti]
             }
-            main.Draw()
-            Sleep(10)
+            Render.Layer(main)
         }
     }
 }

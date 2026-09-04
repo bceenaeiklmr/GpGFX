@@ -23,28 +23,31 @@ Notification(str := "", color1 := "lime", color2 := "000000", timeout := 1000) {
     rect.color := [color1, color2]
     rect.w := 0
 
-    ; Basically how fast the rectangle grows
-    unit := 1
+    ; Setup 60 FPS pacing
+    Fps.SetTarget(144)
+
+    ; Animation growth speed
+    unit := 20
 
     ; Grow
     loop (lyr.w // unit) {
-        lyr.Draw()
         rect.w += unit
+        Render.Layer(lyr)
     }
-    ; Text
+    ; Typewriter text
     loop StrLen(str) {
         strg := SubStr(str, 1, A_index)
         rect.Text(strg, 'black', 24)
-        Sleep(15.6)
-        lyr.Draw()
+        Render.Layer(lyr)
     }
-    ; Wait
-    Sleep(timeout)
+    ; Pause
+    Time.Delay(timeout)
     rect.str := ""
-    lyr.Draw()
+    Render.Layer(lyr)
     ; Shrink
     loop (lyr.w // unit) {
-        rect.w -= 1
-        lyr.Draw()
+        rect.w -= unit
+        Render.Layer(lyr)
     }
+    lyr.Dispose()
 }

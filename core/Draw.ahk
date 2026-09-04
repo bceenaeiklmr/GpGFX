@@ -29,7 +29,7 @@
  * ; 2. Draw using layer method syntax
  * lyr.Draw()
  */
-Draw(lyr) {
+Draw(lyr, updateWindow := true) {
 
     static RectF := Buffer(16, 0)
     local x, y, w, h, x1, y1, x2, y2, lyrW, lyrH, prevX, prevY, prevW, prevH, v, gfx, ptr, pState
@@ -645,16 +645,18 @@ Draw(lyr) {
 
     ; Update the window
     ; @credit iseahound - TextRender v1.9.3, RenderOnScreen (https://github.com/iseahound/TextRender)
-    DllCall("UpdateLayeredWindow"
-        ,     "ptr", lyr.hwnd                                             ; hWnd
-        ,     "ptr", 0                                                    ; hdcDst
-        , "uint64*", (dstX & 0xFFFFFFFF) | ((dstY & 0xFFFFFFFF) << 32)    ; *pptDst (Screen destination)
-        , "uint64*", (winW & 0xFFFFFFFF) | ((winH & 0xFFFFFFFF) << 32)    ; *psize (Layer cropped size)
-        ,     "ptr", lyr.gfx.hdc                                          ; hdcSrc (Source DC)
-        , "uint64*", (srcX & 0xFFFFFFFF) | ((srcY & 0xFFFFFFFF) << 32)    ; *pptSrc (DC source point)
-        ,    "uint", 0                                                    ; crKey
-        ,   "uint*", lyr.alpha << 16 | 0x01000000                         ; *pblend (Alpha blend)
-        ,    "uint", 2)                                                   ; dwFlags (ULW_ALPHA)
+    if (updateWindow) {
+        DllCall("UpdateLayeredWindow"
+            ,     "ptr", lyr.hwnd                                             ; hWnd
+            ,     "ptr", 0                                                    ; hdcDst
+            , "uint64*", (dstX & 0xFFFFFFFF) | ((dstY & 0xFFFFFFFF) << 32)    ; *pptDst (Screen destination)
+            , "uint64*", (winW & 0xFFFFFFFF) | ((winH & 0xFFFFFFFF) << 32)    ; *psize (Layer cropped size)
+            ,     "ptr", lyr.gfx.hdc                                          ; hdcSrc (Source DC)
+            , "uint64*", (srcX & 0xFFFFFFFF) | ((srcY & 0xFFFFFFFF) << 32)    ; *pptSrc (DC source point)
+            ,    "uint", 0                                                    ; crKey
+            ,   "uint*", lyr.alpha << 16 | 0x01000000                         ; *pblend (Alpha blend)
+            ,    "uint", 2)                                                   ; dwFlags (ULW_ALPHA)
+    }
     
     ; Free the reference to the layer object
     if (freeRef)

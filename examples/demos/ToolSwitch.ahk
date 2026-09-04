@@ -80,9 +80,9 @@ loop {
         ; Breaks the loop
         default: break
     }
-    ; The layer can be draw with a function or with its own method
-    lyr.Draw
-    Sleep(t)
+    ; Render the current tool configuration
+    Draw(lyr)
+    Time.Delay(t)
 }
 ; Without a function the window will not be destroyed,
 ; calling End is necessary in this case

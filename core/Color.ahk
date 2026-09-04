@@ -648,35 +648,9 @@ class Color {
     }
 
     /**
-     * Curated standard UI themes with pre-resolved 32-bit ARGB constants.
+     * Curated standard UI themes and design palettes (delegates to Palette class).
      */
-    static Palette := {
-        Nord: {
-            bg: 0xFF2E3440, bgAlt: 0xFF3B4252, fg: 0xFFECEFF4,
-            accent: 0xFF88C0D0, frost: 0xFF81A1C1,
-            danger: 0xFFBF616A, success: 0xFFA3BE8C, warning: 0xFFEBCB8B, orange: 0xFFD08770
-        },
-        Dracula: {
-            bg: 0xFF282A36, bgAlt: 0xFF44475A, fg: 0xFFF8F8F2,
-            accent: 0xFFBD93F9, cyan: 0xFF8BE9FD, pink: 0xFFFF79C6,
-            danger: 0xFFFF5555, success: 0xFF50FA7B, warning: 0xFFFFB86C
-        },
-        Catppuccin: {
-            bg: 0xFF1E1E2E, bgAlt: 0xFF313244, fg: 0xFFCDD6F4,
-            accent: 0xFF89B4FA, mauve: 0xFFCBA6F7, peach: 0xFFFAB387,
-            danger: 0xFFF38BA8, success: 0xFFA6E3A1, warning: 0xFFF9E2AF, sky: 0xFF89DCEB
-        },
-        Cyberpunk: {
-            bg: 0xFF0D0221, bgAlt: 0xFF261447, fg: 0xFFF0F6F0,
-            accent: 0xFF00F0FF, pink: 0xFFFF007F, yellow: 0xFFFFE600,
-            danger: 0xFFFF0055, purple: 0xFF712275
-        },
-        Monokai: {
-            bg: 0xFF272822, bgAlt: 0xFF3E3D32, fg: 0xFFF8F8F2,
-            accent: 0xFF66D9EF, pink: 0xFFF92672, green: 0xFFA6E22E,
-            orange: 0xFFFD971F, yellow: 0xFFE6DB74, purple: 0xFFAE81FF
-        }
-    }
+    static Palette => Palette
     static GitHubBlue           := 0xFF0969DA,
            GitHubGray900        := 0xFF0D1117,
            GitHubGray800        := 0xFF161B22

@@ -9,13 +9,13 @@
  * Gradient color, filling a grid of 100 rectangles 1 by 1.
  * With delay, without delay.
  */
-TestGradientRects(10)
+TestGradientRects(60)
 
-TestGradientRects(-1)
+TestGradientRects(0)
 
 End()
 
-TestGradientRects(sleeptime := 10) {
+TestGradientRects(fps := 60) {
 
     local lyr, obj
 
@@ -26,12 +26,15 @@ TestGradientRects(sleeptime := 10) {
     ; Enable overdraw on the layer since the positions are static
     lyr.Redraw := true
 
+    ; Set frame pacing target
+    Fps.SetTarget(fps)
+
     ; Render the layer using a gradient color transition
     loop obj.Length { 
         obj[A_Index].color := ["15410f", "Lime"]
         Render.Layer(lyr)
-        Sleep(sleeptime)
     }
 
     Fps.Display()
+    lyr.Dispose()
 }

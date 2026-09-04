@@ -147,22 +147,33 @@ Container(x, y, w, h)
 ### Shape geometry & hierarchy
 
 ```text
-shp.Move(x?, y?, w?, h?)
-shp.Position(x?, y?)            ; e.g. shp.Position("center", "center")
-shp.Resize(option?, cmatrix?)
-shp.BringToFront()              ; Renders on top of other shapes
-shp.SendToBack()                ; Renders behind other shapes
+shp.Move(x?, y?, w?, h?)        ; Moves or resizes the shape
+shp.Position(x?, y?)            ; Centers or positions on layer: "center", integers, or floats
+shp.Resize(option?, cmatrix?)   ; Resizes shape geometry
+shp.BringToFront()              ; Moves shape to front of layer Z-order (renders on top)
+shp.SendToBack()                ; Moves shape to back of layer Z-order (renders behind)
 shp.Show() / shp.Hide() / shp.ShowHide()
+
+; Computed edge & bounding properties (read-only)
+shp.Right                       ; x + w
+shp.Bottom                      ; y + h
+shp.CenterX                     ; x + w / 2
+shp.CenterY                     ; y + h / 2
+shp.Bounds                      ; { x, y, w, h }
 ```
+
+> [!NOTE]
+> `shp.Position("center")` positions the shape on the parent layer. In contrast, methods like `shp.Center()`, `shp.TopLeft()`, and `shp.Shift()` below configure typographic text alignment *inside* the shape.
 
 ### Typographic & text alignment (inside shapes)
 
 ```text
 shp.Text(str, color?, size?, font?, style?, quality?, alignH?, alignV?)
-shp.TextAlign(h?, v?)           ; e.g. shp.TextAlign("center", "middle")
-shp.Shift(dx, dy)               ; Alias for shp.TextOffset(dx, dy)
-shp.Center()                    ; Centers text inside the shape
-shp.TopLeft() / shp.TopRight() / shp.BottomLeft() / shp.BottomRight()
+shp.TextAlign(h?, v?)           ; Text alignment: "left"|"center"|"right", "top"|"middle"|"bottom"
+shp.Center()                    ; Aligns text to center of shape (not shape position)
+shp.TopLeft() / shp.TopRight()  ; Aligns inner text to top-left / top-right
+shp.BottomLeft() / shp.BottomRight() ; Aligns inner text to bottom-left / bottom-right
+shp.Shift(dx, dy)               ; Offsets inner text (alias for shp.TextOffset)
 shp.GetWordRect(word)           ; Returns exact bounding box of word
 shp.GetCharPos(charIndex)       ; Returns caret coordinate for text editing
 ```
@@ -204,51 +215,225 @@ Signal.Animate(opacity, 0, 255, 300, "easeOutQuad")
 
 **Transparent layered-window manager, DIBSection lifecycle, message dispatching, and Z-order stack.**
 
+A `Layer` is the core presentation surface in GpGFX. It allocates a 32-bit ARGB DIBSection backing buffer in memory and presents vector graphics directly through a native Win32 layered window (`WS_EX_LAYERED`). 
+
+When a `Layer` is created, it automatically registers as `LayerStack.ActiveLayer`, allowing declarative shape builders (`Rectangle`, `Circle`, `Text`, `Picture`, etc.) to attach to it automatically.
+
+### Constructor Overloads
+
 ```text
 Layer(x?, y?, w?, h?, name?, hOwner?)
-
-lyr.Draw(trigger?, updateFn?)
-lyr.Move(x?, y?, w?, h?)
-lyr.Resize(w, h)
-lyr.Center()
-lyr.Drag()
-lyr.AttachToDesktop()           ; Pins behind desktop icons (Rainmeter Progman mode)
-lyr.SnapToWindow(hwnd)          ; Snaps to target window frame
-lyr.FollowWindow(hwnd)          ; Continuously tracks target window position
-lyr.SetMonitor(disp?, align?)   ; Positions on specific display (e.g. 2, "center")
-lyr.ToClipboard()               ; Copies 32-bit ARGB graphic to Windows Clipboard
-lyr.toFile(filepath)            ; Exports layer to PNG, JPG, BMP, GIF, TIFF
-lyr.Dispose()
-
-LayerStack.Register(layerObj)
-LayerStack.Unregister(id)
-LayerStack.PushHistory(ptr)
-LayerStack.PopHistory(ptr)
-LayerStack.ActiveLayer          ; Active target layer for shape creation
 ```
 
-### Typical lifecycle & features
+| Syntax | Dimensions & Position | Use Case |
+| :--- | :--- | :--- |
+| `Layer()` | `(0, 0, A_ScreenWidth, A_ScreenHeight)` | Fullscreen overlay or multi-monitor canvas |
+| `Layer("HUD")` | `(0, 0, A_ScreenWidth, A_ScreenHeight)` | Fullscreen overlay with a friendly identifier |
+| `Layer(w, h)` | Centered on primary display | Centered application cards, dialogs, widgets |
+| `Layer(w, h, "HUD")` | Centered on primary display | Centered application window with a friendly identifier |
+| `Layer(x, y, w, h, name?, hOwner?)` | Explicit coordinates `(x, y)` and size `(w, h)` | Fixed-position HUDs, child windows, docked toolbars |
 
 ```autohotkey
-lyr := Layer(600, 400).Center()
+; Fullscreen transparent overlay
+hud := Layer()
 
-; Build scene...
-RoundedRectangle(600, 400, 16, "0xFF1E1E2E")
+; Centered 600x400 window card
+card := Layer(600, 400).Center()
 
-; 1. Render once
-lyr.Draw()
-
-; 2. Or run a recurring frame loop
-lyr.Draw(16, OnFrame)
-
-; 3. Or create a 1-line self-destructing toast (auto-disposed after 2000 ms)
-lyr.Draw(-2000)
-
-; 4. Or pin directly to the desktop wallpaper
-lyr.AttachToDesktop()
+; Explicit positioning with a parent owner window
+toolbar := Layer(100, 50, 400, 60, "AppToolbar", mainHwnd)
 ```
 
-A layer is the bridge between GpGFX's scene objects and Windows. Shapes are rasterized into a 32-bit ARGB backing store and presented through the layered window.
+### Execution & Rendering Pipeline (`lyr.Draw`)
+
+The `lyr.Draw(trigger?, updateFn?)` method is the central execution router for presenting graphics to the screen:
+
+```text
+lyr.Draw(trigger?, updateFn?)
+```
+
+| Call Pattern | Behavior | Example |
+| :--- | :--- | :--- |
+| `lyr.Draw()` | Single-shot immediate hardware flush to screen via `UpdateLayeredWindow`. | `lyr.Draw()` |
+| `lyr.Draw(intervalMs, updateFn?)` | Starts a recurring `SetTimer` frame loop. Calls `updateFn(this)` each tick, self-stopping if the window is closed. | `lyr.Draw(16, OnFrame)` |
+| `lyr.Draw(-timeoutMs)` | Self-destructing Toast notification. Renders immediately and auto-disposes after `Abs(timeoutMs)`. | `lyr.Draw(-2500)` |
+| `lyr.Draw(signal, updateFn?)` | Subscribes to a `Signal`. Fires `updateFn(val, this)` and renders immediately whenever the signal value changes. | `lyr.Draw(scoreSignal)` |
+| `lyr.Draw(0)` / `lyr.Draw(false)` | Halts any active recurring interval timer on this layer (alias for `lyr.Stop()`). | `lyr.Draw(0)` |
+
+#### Additional Rendering Methods
+
+```text
+lyr.DrawOnce(delayMs)           ; Schedules a deferred one-shot render after delayMs
+lyr.Render()                    ; Renders one frame with QPC spin-wait pacing and FPS telemetry
+lyr.Stop()                      ; Cancels active interval timer loops
+lyr.Wait(timeoutMs?)            ; Synchronous modal display; blocks execution until closed or timed out
+Layer.Draw()                    ; Static method: renders all active layers in LayerStack in Z-order
+```
+
+### Window Dragging & Hit Testing
+
+GpGFX supports seamless window dragging without requiring Win32 titlebars:
+
+```text
+lyr.Drag(dragArea?)
+```
+
+```autohotkey
+; 1. Drag by clicking anywhere on the layer
+lyr.Drag()
+
+; 2. Titlebar strip: only dragging within the top 40px moves the window
+lyr.Drag(40)
+
+; 3. Rectangular drag zone: specify an explicit bounding box {x, y, w, h}
+lyr.Drag({x: 0, y: 0, w: 400, h: 48})
+
+; 4. Multiple drag zones: array of bounding boxes
+lyr.Drag([{x: 0, y: 0, w: 200, h: 40}, {x: 300, y: 0, w: 100, h: 40}])
+
+; 5. Custom hit-test callback (this, mouseX, mouseY)
+lyr.Drag((lyr, mx, my) => (my <= 50 && mx <= 300))
+```
+
+### Window Parenting, Docking & Desktop Pinning
+
+```text
+lyr.Attach(childLayer, offsetX, offsetY)
+lyr.SnapToWindow(targetHwnd, edge?, offset?)
+lyr.FollowWindow(targetHwnd, offsetX?, offsetY?)
+lyr.AttachToDesktop()
+lyr.DetachFromDesktop()
+```
+
+- **`lyr.Attach(child, offX, offY)`**: Docks a child layer to the parent. Moving the parent automatically moves all attached child layers with zero coordinate drift.
+- **`lyr.SnapToWindow(hwnd, edge, offset)`**: Aligns the layer to the bounding box of any external Win32 window (edges: `"top"`, `"bottom"`, `"left"`, `"right"`).
+- **`lyr.FollowWindow(hwnd, offX, offY)`**: Activates a high-frequency tracking loop that keeps the layer attached to a moving third-party window.
+- **`lyr.AttachToDesktop()`**: Pins the layer behind desktop icons directly onto Windows Explorer's `WorkerW` / `Progman` wallpaper surface (Rainmeter-style live desktop widgets).
+- **`lyr.DetachFromDesktop()`**: Restores a pinned desktop layer back to a standard desktop window.
+
+### Geometry & Multi-Monitor Alignment
+
+```text
+lyr.Center()                     ; Centers layer on current screen or monitor
+lyr.Move(x?, y?, w?, h?)         ; Repositions and/or resizes the window
+lyr.Resize(w, h)                 ; Reallocates backing DIBSection and graphics buffers
+lyr.SetMonitor(monitorIndex?, alignment?) ; Moves to specific display (e.g. 2, "center")
+lyr.SyncPos()                    ; Re-synchronizes cached layer coordinates from native OS window position
+```
+
+### Window Styles & State
+
+```text
+lyr.ClickThrough                 ; Property (true/false) toggling WS_EX_TRANSPARENT (0x20)
+lyr.Clickthrough(enable := true) ; Chainable method alias for ClickThrough
+lyr.AlwaysOnTop                  ; Property (true/false) toggling HWND_TOPMOST
+lyr.TopMost(enable := true)      ; Chainable method alias for AlwaysOnTop
+lyr.NoActivate(enable := true)   ; Applies WS_EX_NOACTIVATE (0x08000000) so clicks never steal focus
+lyr.Alpha                        ; Opacity level (0 - 255) passed to UpdateLayeredWindow
+lyr.SetAlpha(val)                ; Immediately updates and synchronizes DWM window alpha
+lyr.FadeIn(durationMs?, target?) ; Smoothly fades in layer (default 300ms, target 255)
+lyr.FadeOut(durationMs?, onDone?); Smoothly fades out layer to 0 and hides it
+lyr.BringToFront(shapeObj)       ; Moves a shape to top of layer Z-order
+lyr.SendToBack(shapeObj)         ; Moves a shape to bottom of layer Z-order
+lyr.SetQuality(preset)           ; Sets rendering quality ("low", "mid", "high")
+lyr.Visible                      ; Visibility state
+lyr.Show() / lyr.Hide() / lyr.ShowHide()
+lyr.Activate()                   ; Brings window to foreground and gives focus
+```
+
+### Export & Direct Memory Access
+
+```text
+lyr.GetPixel(x, y)               ; Reads 32-bit ARGB pixel directly from raw pBits RAM (zero-copy)
+lyr.ToBitmap(cropToContent?)     ; Returns a new independent GdipBitmap cloned from rendered surface
+lyr.ToClipboard(cropToContent?)  ; Copies current 32-bit ARGB graphic to Windows Clipboard
+lyr.toFile(filepath, crop?)      ; Saves layer to disk (PNG, JPEG, BMP, GIF, TIFF)
+lyr.Dispose()                    ; Safely destroys GDI+ graphics, DIBSection, timers, and HWND
+```
+
+### Multi-Layer Coordination (`LayerStack`)
+
+`LayerStack` tracks all live layers, orchestrates Z-order, and manages the active layer context:
+
+```autohotkey
+; Check or set the active layer used for declarative shape creation
+activeLyr := LayerStack.ActiveLayer
+LayerStack.ActiveLayer := backgroundLayer
+
+; Swap Z-order between two layers
+LayerStack.Swap(layerA, layerB)
+
+; Emergency recovery: hides all active layers and makes them click-through
+LayerStack.HideAll()
+
+; Gracefully disposes all registered layers
+LayerStack.DisposeAll()
+```
+
+### Comprehensive Examples
+
+#### 1. Draggable App Window with Titlebar
+```autohotkey
+#Requires AutoHotkey v2
+#include GpGFX.ahk
+
+app := Layer(460, 280).Center()
+
+; Background card
+RoundedRectangle(460, 280, 14, "0xFF1E1E2E")
+RoundedRectangle(460, 280, 14, "0xFF313244", false)
+
+; Titlebar header (drag restricted to top 42px)
+Rectangle(0, 0, 460, 42, "0xFF181825")
+Text(20, 12, 400, 20, "GpGFX Application Window", "0xFFCDD6F4", 11, "Segoe UI", "Bold").Left()
+
+; Content body
+Text("Restricted titlebar dragging enabled.", "0xFFA6ADC8", 10).Center().Shift(0, 20)
+
+; Enable drag on the top 42px strip only and present
+app.Drag(42).Draw()
+
+Esc::ExitApp()
+```
+
+#### 2. Non-Activating Click-Through HUD Overlay
+```autohotkey
+#Requires AutoHotkey v2
+#include GpGFX.ahk
+
+; Fullscreen click-through overlay that never steals focus from games or apps
+hud := Layer()
+hud.Clickthrough(true).NoActivate(true).TopMost(true)
+
+; Render a subtle crosshair or telemetry in top-right
+RoundedRectangle(A_ScreenWidth - 220, 30, 190, 60, 8, "0xCC11111B")
+Text(A_ScreenWidth - 210, 42, 170, 36, "HUD Active`nClick-Through: True", "0xFF89B4FA", 9.5, "Segoe UI", "Bold").Center()
+
+hud.Draw()
+
+Esc::ExitApp()
+```
+
+#### 3. Self-Destructing Toast Notification Card
+```autohotkey
+#Requires AutoHotkey v2
+#include GpGFX.ahk
+
+ShowToast(msg, durationMs := 2500) {
+    toast := Layer(320, 64)
+    toast.Move(A_ScreenWidth - 340, A_ScreenHeight - 100)
+    toast.TopMost(true).NoActivate(true)
+
+    RoundedRectangle(320, 64, 10, "0xEE1E1E2E")
+    RoundedRectangle(320, 64, 10, "0xFFA6E3A1", false)
+    Text(16, 14, 288, 36, msg, "0xFFCDD6F4", 10, "Segoe UI", "Bold").Left().Middle()
+
+    ; Negative duration renders immediately and automatically disposes after durationMs
+    toast.Draw(-durationMs)
+}
+
+ShowToast("Build completed successfully!")
+```
 
 ---
 
