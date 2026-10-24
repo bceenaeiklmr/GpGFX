@@ -114,6 +114,9 @@ No child GUI controls. No manual text invalidation. Bind state and let the shape
 # Core API Reference
 
 This section is the **concise reference** for the core GpGFX modules.
+For the complete machine-readable feature catalog (every class, method,
+and the demo index — intended as the first read for AI-assisted work),
+see [`docs/API.md`](docs/API.md).
 
 ## `Shape.ahk` & `Shapes.ahk`
 
