@@ -19,7 +19,7 @@
 
 ; Directives
 #Requires AutoHotkey v2
-#Warn All ;, OutputDebug
+#Warn All, StdOut
 
 ; Preload GDI+ library
 #DllLoad Gdiplus.dll

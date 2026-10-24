@@ -78,7 +78,7 @@ class WorkerPool {
             DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", Layer.w, "int", Layer.h, "int", Layer.w * 4, "int", 0x26200A, "ptr", fm.pBuf + 65536, "ptr*", &pSharedBmp:=0)
 
             try {
-                cmd := Format('"{1}" "{2}" "{3}" "{4}" "{5}" "{6}" {7}', 
+                cmd := Format('"{1}" /ErrorStdOut "{2}" "{3}" "{4}" "{5}" "{6}" {7}', 
                     A_AhkPath, workerScript, memName, mtxName, semTaskName, semDoneName, idx)
                 pid := Run(cmd, , "Hide")
                 
@@ -494,6 +494,11 @@ class WorkerPool {
                 NumPut("int", 99, w.fm.pBuf, 0)
                 w.mtx.Release()
                 w.semTask.Release(1)
+            }
+            if (w.HasOwnProp("pid") && ProcessExist(w.pid)) {
+                if (!ProcessWaitClose(w.pid, 0.5)) {
+                    try ProcessClose(w.pid)
+                }
             }
         }
 

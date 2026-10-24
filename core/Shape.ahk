@@ -948,7 +948,21 @@ class Shape {
      * @returns {Shape} this (for chaining)
      */
     AddImage(source, option := 0, effect := 0, x := 0, y := 0) {
-        local bmp, maxW, maxH, scale, targetW, targetH
+        local bmp, maxW, maxH, scale, targetW, targetH, fitMode := ""
+        local dstW, dstH, pCoverBmp := 0, coverGfx := 0, dstX, dstY, imgAttr := 0, cm := 0, curFmt := 0
+
+        if (IsObject(option) && option.HasProp("fit")) {
+            fitMode := StrLower(String(option.fit))
+        } else if (option is String && option ~= "i)^(cover|contain)$") {
+            fitMode := StrLower(option)
+        }
+
+        if (IsObject(option) && option.HasProp("rounded") && !this.HasProp("rounded")) {
+            this.rounded := option.rounded
+        }
+        if (fitMode != "") {
+            this.fit := fitMode
+        }
 
         if (IsObject(this.Bitmap) && this.Bitmap.HasMethod("Dispose")) {
             this.Bitmap.Dispose()
@@ -974,14 +988,76 @@ class Shape {
         if (!bmp || !bmp.ptr)
             return this
 
-        if (!option) {
-            maxW := this.w * 0.95
-            maxH := this.h * 0.95
-            scale := (bmp.w && bmp.h) ? Min(maxW / bmp.w, maxH / bmp.h) : 1
+        if (!option || fitMode != "") {
+            if (fitMode == "cover" && this.w > 0 && this.h > 0 && bmp.w > 0 && bmp.h > 0) {
+                dstW := Round(this.w)
+                dstH := Round(this.h)
+                scale := Max(dstW / bmp.w, dstH / bmp.h)
+                targetW := Max(1, Round(bmp.w * scale))
+                targetH := Max(1, Round(bmp.h * scale))
+                DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", dstW, "int", dstH, "int", 0, "int", 0xE200B, "ptr", 0, "ptr*", &pCoverBmp:=0)
+                if (pCoverBmp) {
+                    DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pCoverBmp, "ptr*", &coverGfx:=0)
+                    DllCall("gdiplus\GdipSetInterpolationMode", "ptr", coverGfx, "int", 7)
+                    DllCall("gdiplus\GdipSetPixelOffsetMode", "ptr", coverGfx, "int", 2)
+                    dstX := (dstW - targetW) // 2
+                    dstY := (dstH - targetH) // 2
+                    if (effect) {
+                        if (IsObject(effect) && effect.HasProp("ptr")) {
+                            cm := effect
+                        } else if (effect is String) {
+                            switch {
+                                case effect ~= "i)^b(right)?$"       : cm := ColorMatrix.bright
+                                case effect ~= "i)^g(ray(scale)?)?$" : cm := ColorMatrix.grayscale
+                                case effect ~= "i)^i(nvert)?$"       : cm := ColorMatrix.invert
+                                case effect ~= "i)^n(eg(ative)?)?$"  : cm := ColorMatrix.negative
+                                case effect ~= "i)^s(ep(ia)?)?$"     : cm := ColorMatrix.sepia
+                                case effect ~= "i)^blue(only)?$"     : cm := ColorMatrix.blueonly
+                                case effect ~= "i)^green(only)?$"    : cm := ColorMatrix.greenonly
+                                case effect ~= "i)^red(only)?$"      : cm := ColorMatrix.redonly
+                                default: cm := 0
+                            }
+                        }
+                        if (cm) {
+                            DllCall("gdiplus\GdipCreateImageAttributes", "ptr*", &imgAttr:=0)
+                            DllCall("gdiplus\GdipSetImageAttributesWrapMode", "ptr", imgAttr, "int", 3)
+                            DllCall("gdiplus\GdipSetImageAttributesColorMatrix", "ptr", imgAttr, "int", 1, "int", 1, "ptr", cm, "ptr", 0, "int", 0)
+                        }
+                    }
+                    DllCall("gdiplus\GdipDrawImageRectRectI"
+                        , "ptr", coverGfx
+                        , "ptr", bmp.ptr
+                        , "int", dstX, "int", dstY, "int", targetW, "int", targetH
+                        , "int", 0, "int", 0, "int", bmp.w, "int", bmp.h
+                        , "int", 2, "ptr", imgAttr, "ptr", 0, "ptr", 0)
+                    if (imgAttr)
+                        DllCall("gdiplus\GdipDisposeImageAttributes", "ptr", imgAttr)
+                    DllCall("gdiplus\GdipDeleteGraphics", "ptr", coverGfx)
+                    if (bmp.HasMethod("Dispose"))
+                        bmp.Dispose()
+                    else if (bmp.HasProp("ptr") && bmp.ptr)
+                        DllCall("gdiplus\GdipDisposeImage", "ptr", bmp.ptr)
+                    bmp := { base: GdipBitmap.Prototype, ptr: pCoverBmp, w: dstW, h: dstH }
+                    this.Bitmap := bmp
+                    this.pBitmap := bmp.ptr
+                    return this
+                }
+            }
+            if (fitMode == "contain") {
+                scale := (bmp.w && bmp.h) ? Min(this.w / bmp.w, this.h / bmp.h) : 1
+            } else {
+                maxW := this.w * 0.95
+                maxH := this.h * 0.95
+                scale := (bmp.w && bmp.h) ? Min(maxW / bmp.w, maxH / bmp.h) : 1
+            }
             targetW := Max(1, Round(bmp.w * scale))
             targetH := Max(1, Round(bmp.h * scale))
             if ((targetW != bmp.w || targetH != bmp.h || effect) && targetW > 0 && targetH > 0) {
                 bmp.Resize("w" . targetW . " h" . targetH, effect)
+            } else {
+                DllCall("gdiplus\GdipGetImagePixelFormat", "ptr", bmp.ptr, "int*", &curFmt:=0)
+                if (curFmt != 0xE200B)
+                    bmp.Resize("w" . bmp.w . " h" . bmp.h)
             }
             this.Bitmap := bmp
             this.pBitmap := bmp.ptr
@@ -989,6 +1065,10 @@ class Shape {
         else {
             if (option || effect) {
                 bmp.Resize(option, effect)
+            } else {
+                DllCall("gdiplus\GdipGetImagePixelFormat", "ptr", bmp.ptr, "int*", &curFmt:=0)
+                if (curFmt != 0xE200B)
+                    bmp.Resize("w" . bmp.w . " h" . bmp.h)
             }
             this.Bitmap := bmp
             this.pBitmap := bmp.ptr
@@ -1771,18 +1851,24 @@ class Shape {
                 this.%yname% := Float(flatPts[yindex])
             }
 
+            ; Bounds callbacks are stored as plain function references, never as
+            ; closures over `this`. AHK v2 is purely reference counted (no cyclic
+            ; GC), so a closure here creates a shape->closure->shape cycle that
+            ; is never freed and leaks the whole shape (its point buffer and all
+            ; per-point properties) on every delete. Layer.Prepare() calls
+            ; shp.getBounds(), which passes the shape implicitly as first param.
             if (this.shape == "Triangle" || this.shape == "FilledTriangle") {
-                this.getBounds := (shp?) => getBoundsTriangle(this)
+                this.getBounds := getBoundsTriangle
             }
             else {
-                this.getBounds := (shp?) => getBoundsPoints(this)
+                this.getBounds := getBoundsPoints
             }
         }
         else if (this.shape == "Bezier") {
-            this.getBounds := (shp?) => getBoundsBezier(this)
+            this.getBounds := getBoundsBezier
         }
         else if (this.shape == "Line") {
-            this.getBounds := (shp?) => getBoundsLine(this)
+            this.getBounds := getBoundsLine
         }
     }
 
@@ -1847,6 +1933,11 @@ class Shape {
         if (this.isDisposed)
             return
         this.isDisposed := true
+
+        ; Drop the bounds callback first: a caller-supplied closure may capture
+        ; this shape, and only an uncounted reference lets the object be freed.
+        if (this.HasProp("getBounds"))
+            this.DeleteProp("getBounds")
 
         if (this.HasProp("Font") && IsObject(this.Font)) {
             Font.Release(this.Font)

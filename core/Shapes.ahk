@@ -1039,6 +1039,8 @@ class Picture extends Shape {
         }
 
         super.__New({ x: posX, y: posY, w: width, h: height, shape: "Picture", isDummy: true })
+        if (IsSet(sOpt) && IsObject(sOpt) && sOpt.HasProp("rounded"))
+            this.rounded := sOpt.rounded
         if (IsSet(sSource))
             this.AddImage(sSource, sOpt?, sEff?)
     }

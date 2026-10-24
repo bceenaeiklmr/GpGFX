@@ -1145,8 +1145,9 @@ class ColorLUT {
     static __InitMCode() {
         if (this.pMCode)
             return
-        local len := 0, buf := Buffer(len, 0), oldProt := 0
+        local len := 0, oldProt := 0
         DllCall("crypt32\CryptStringToBinaryA", "astr", this.mcodeB64, "uint", 0, "uint", 1, "ptr", 0, "uint*", &len, "ptr", 0, "ptr", 0)
+        local buf := Buffer(len, 0)
         DllCall("crypt32\CryptStringToBinaryA", "astr", this.mcodeB64, "uint", 0, "uint", 1, "ptr", buf.ptr, "uint*", &len, "ptr", 0, "ptr", 0)
         DllCall("VirtualProtect", "ptr", buf.ptr, "uptr", len, "uint", 0x40, "uint*", &oldProt)
         this.pMCode := buf
@@ -1175,6 +1176,23 @@ class ColorLUT {
 
         if (!this.pMCode)
             this.__InitMCode()
+
+        if (IsObject(targetBitmap) && targetBitmap.HasProp("gfx") && targetBitmap.gfx.HasProp("pBits")) {
+            scan0 := targetBitmap.gfx.pBits
+            w := targetBitmap.w
+            h := targetBitmap.h
+            stride := w * 4
+            bufB := this.__ToBuffer(lutB)
+            bufG := this.__ToBuffer(lutG)
+            bufR := this.__ToBuffer(lutR)
+            ptrA := 0
+            if (IsSet(lutA) && lutA) {
+                bufA := this.__ToBuffer(lutA)
+                ptrA := bufA.ptr
+            }
+            DllCall(this.pMCode.ptr, "ptr", scan0, "int", w, "int", h, "int", stride, "ptr", bufB.ptr, "ptr", bufG.ptr, "ptr", bufR.ptr, "ptr", ptrA, "cdecl")
+            return true
+        }
 
         pBitmap := (IsObject(targetBitmap) && targetBitmap.HasProp("ptr")) ? targetBitmap.ptr : targetBitmap
         if (!pBitmap)
@@ -1217,6 +1235,41 @@ class ColorLUT {
         DllCall(this.pMCode.ptr, "ptr", scan0, "int", w, "int", h, "int", stride, "ptr", bufB.ptr, "ptr", bufG.ptr, "ptr", bufR.ptr, "ptr", ptrA, "cdecl")
 
         DllCall("gdiplus\GdipBitmapUnlockBits", "ptr", pBitmap, "ptr", bmd)
+        return true
+    }
+
+    /**
+     * Applies a 256-entry color lookup table directly to a 32bpp unmanaged Scan0 buffer.
+     *
+     * @param {Pointer} scan0 Pointer to unmanaged memory
+     * @param {Integer} w Width in pixels
+     * @param {Integer} h Height in pixels
+     * @param {Integer} stride Stride in bytes
+     * @param {Array|Buffer} lutB 256-byte table for Blue channel
+     * @param {Array|Buffer} lutG 256-byte table for Green channel
+     * @param {Array|Buffer} lutR 256-byte table for Red channel
+     * @param {Array|Buffer} [lutA] Optional 256-byte table for Alpha channel
+     * @returns {Boolean} True on success
+     */
+    static ApplyScan0(scan0, w, h, stride, lutB, lutG, lutR, lutA?) {
+        local bufB, bufG, bufR, ptrA, bufA
+
+        if (!this.pMCode)
+            this.__InitMCode()
+
+        if (!scan0 || w <= 0 || h <= 0)
+            return false
+
+        bufB := this.__ToBuffer(lutB)
+        bufG := this.__ToBuffer(lutG)
+        bufR := this.__ToBuffer(lutR)
+        ptrA := 0
+        if (IsSet(lutA) && lutA) {
+            bufA := this.__ToBuffer(lutA)
+            ptrA := bufA.ptr
+        }
+
+        DllCall(this.pMCode.ptr, "ptr", scan0, "int", w, "int", h, "int", stride, "ptr", bufB.ptr, "ptr", bufG.ptr, "ptr", bufR.ptr, "ptr", ptrA, "cdecl")
         return true
     }
 

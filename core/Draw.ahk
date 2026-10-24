@@ -377,6 +377,28 @@ Draw(lyr, updateWindow := true) {
             DllCall("gdiplus\GdipSetSmoothingMode", "ptr", gfx, "int", 0),         ; No anti-alias
             DllCall("gdiplus\GdipSetCompositingQuality", "ptr", gfx, "int", 0)     ; AssumeLinear       
 
+            ; Optional rounded clipping for images
+            if ((v.HasProp("rounded") && v.rounded > 0) || (v.HasProp("shape") && v.shape ~= "i)Round" && v.HasProp("r") && v.r > 0)) {
+                r := v.HasProp("rounded") ? Float(v.rounded) : Float(v.r)
+                r := Max(1, Min(r, v.w / 2, v.h / 2))
+                d := 2 * r
+                DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pPath:=0),
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", Float(v.x), "float", Float(v.y), "float", d, "float", d, "float", 180, "float", 90),
+                DllCall("gdiplus\GdipAddPathLine", "ptr", pPath, "float", Float(v.x + r), "float", Float(v.y), "float", Float(v.x + v.w - r), "float", Float(v.y)),
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", Float(v.x + v.w - d), "float", Float(v.y), "float", d, "float", d, "float", 270, "float", 90),
+                DllCall("gdiplus\GdipAddPathLine", "ptr", pPath, "float", Float(v.x + v.w), "float", Float(v.y + r), "float", Float(v.x + v.w), "float", Float(v.y + v.h - r)),
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", Float(v.x + v.w - d), "float", Float(v.y + v.h - d), "float", d, "float", d, "float", 0, "float", 90),
+                DllCall("gdiplus\GdipAddPathLine", "ptr", pPath, "float", Float(v.x + v.w - r), "float", Float(v.y + v.h), "float", Float(v.x + r), "float", Float(v.y + v.h)),
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", Float(v.x), "float", Float(v.y + v.h - d), "float", d, "float", d, "float", 90, "float", 90),
+                DllCall("gdiplus\GdipAddPathLine", "ptr", pPath, "float", Float(v.x), "float", Float(v.y + v.h - r), "float", Float(v.x), "float", Float(v.y + r)),
+                DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath),
+                DllCall("gdiplus\GdipSetClipPath", "ptr", gfx, "ptr", pPath, "int", 0),
+                DllCall("gdiplus\GdipDeletePath", "ptr", pPath)
+            }
+            else if (v.HasProp("fit") && v.fit == "cover" && (v.Bitmap.w != v.w || v.Bitmap.h != v.h || v.bmpX || v.bmpY)) {
+                DllCall("gdiplus\GdipSetClipRectI", "ptr", gfx, "int", Integer(v.x), "int", Integer(v.y), "int", Integer(v.w), "int", Integer(v.h), "int", 0)
+            }
+
             ; Align the image to center inside the object
             x2 := v.x + (v.w - v.Bitmap.w) // 2
             y2 := v.y + (v.h - v.Bitmap.h) // 2
@@ -405,6 +427,18 @@ Draw(lyr, updateWindow := true) {
                     , "ptr", 0                                       ; imageAttributes
                     , "ptr", 0                                       ; callback
                     , "ptr", 0)                                      ; callbackData
+            }
+            else if (v.w != v.Bitmap.w || v.h != v.Bitmap.h) {
+                ; Shape dimensions differ from native bitmap: scale directly to shape geometry
+                DllCall("gdiplus\GdipDrawImageRectRectI"
+                    , "ptr", gfx
+                    , "ptr", v.Bitmap.ptr
+                    , "int", Integer(v.x), "int", Integer(v.y), "int", Integer(v.w), "int", Integer(v.h)
+                    , "int", 0, "int", 0, "int", v.Bitmap.w, "int", v.Bitmap.h
+                    , "int", 2
+                    , "ptr", 0
+                    , "ptr", 0
+                    , "ptr", 0)
             }
             else {
                 ; GdipDrawImage is faster than GdipDrawImageRectRect, but it doesn't support scaling

@@ -257,6 +257,8 @@ intToARGB(int, rgb := false) => itoARGB(int, rgb)
  * @returns {Boolean}
  */
 IsBool(val) => (val is Integer) && (val == 0 || val == 1)
+IsInteger(val) => (val is Integer)
+IsFloat(val) => (val is Float)
 
 /**
  * Checks if an integer is a valid 8-bit alpha value (0 to 255).

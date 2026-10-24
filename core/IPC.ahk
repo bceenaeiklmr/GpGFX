@@ -297,7 +297,15 @@ class Worker {
             this.process := {pid: pid}
             this.isReady := true
         } catch as e {
-            GpGFX.DebugLog("[!] Failed to spawn worker: " e.Message "`n")
+            ; Not GpGFX.DebugLog, unlike every other diagnostic in core: this file is
+            ; also loaded on its own, since a process that only wants FileMapping or a
+            ; Mutex has no reason to include GpGFX.ahk. There, GpGFX is not a name that
+            ; exists, so the handler for "worker failed to spawn" would itself fault on
+            ; an unset variable and the spawn failure would be reported as a crash in
+            ; the catch block - the one moment the message matters. OutputDebug is what
+            ; DebugLog calls when its gate is open anyway; the gate costs one class
+            ; reference, and this file must not depend on that class.
+            OutputDebug("[!] Failed to spawn worker: " e.Message "`n")
         }
     }
 
