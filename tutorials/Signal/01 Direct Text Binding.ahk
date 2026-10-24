@@ -5,7 +5,7 @@
 
 ; file: Direct Text Binding (Auto-Updating Text)
 
-#include ../../../GpGFX.ahk
+#include ../../GpGFX.ahk
 
 ; Omitting the callback in .Bind(sig) binds sig.Value directly to the shape 's text string:
 

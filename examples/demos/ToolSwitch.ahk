@@ -54,7 +54,7 @@ loop {
         
         ; Random gradient colors
         case 6:
-            rect.color := [RandomARGB(), ""]
+            rect.color := [Color.RandomARGB(), ""]
             rect.str := "Random gradient colors"
         
         ; Hatch pattern without background
@@ -86,4 +86,4 @@ loop {
 }
 ; Without a function the window will not be destroyed,
 ; calling End is necessary in this case
-End
+End()

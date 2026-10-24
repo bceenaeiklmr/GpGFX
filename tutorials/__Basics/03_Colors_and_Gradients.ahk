@@ -33,7 +33,7 @@ RoundedRectangle(230, 90, 90, 50, 8, "#CC10B981")
 Text(230, 105, 90, 20, "Alpha 80%", "White", 9).Center()
 
 ; Standard 0xARGB integer
-RoundedRectangle(330, 90, 90, 50, 8, 0xFF8B5CF6")
+RoundedRectangle(330, 90, 90, 50, 8, 0xFF8B5CF6)
 Text(330, 105, 90, 20, "0xFF8B5CF6", "White", 9).Center()
 
 ; Section 2: Linear Gradients

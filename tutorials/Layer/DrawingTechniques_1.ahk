@@ -2,8 +2,7 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-
-#include ../../../GpGFX.ahk
+#include ../../GpGFX.ahk
 
 lyr := Layer(600, 480)
 

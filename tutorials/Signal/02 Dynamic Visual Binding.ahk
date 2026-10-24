@@ -7,7 +7,7 @@
 
 ; Pass a callback (val, shape) => ... to transform numbers into width, height, colors, or coordinates:
 
-#Include ../../../GpGFX.ahk
+#include ../../GpGFX.ahk
 
 lyr := Layer(100, 100, 400, 80, "ProgressHUD")
 RoundedRectangle(10, "0xF0181824", true)              ; Background card

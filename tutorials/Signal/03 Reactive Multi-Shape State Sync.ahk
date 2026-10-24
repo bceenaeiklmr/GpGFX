@@ -3,12 +3,12 @@
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
 
-;3. 🎨 Reactive Multi-Shape State Sync (Single Signal → Multiple Shapes)
+; 3. Reactive Multi-Shape State Sync (Single Signal -> Multiple Shapes)
 
 ;  A single signal can drive multiple UI elements simultaneously (e.g. status indicator dot + label +
 ;  background glow):
 
-#Include ../../../GpGFX.ahk
+#include ../../GpGFX.ahk
 
 lyr := Layer(100, 100, 300, 70, "StatusHUD")
 bgCard := RoundedRectangle(12, "0xF0181824", true)

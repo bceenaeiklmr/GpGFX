@@ -2,9 +2,8 @@
 ; License:   MIT License
 ; Author:    Bence Markiel (bceenaeiklmr)
 ; Github:    https://github.com/bceenaeiklmr/GpGFX
-
 #Warn All, StdOut
-#Include ../../../GpGFX.ahk
+#include ../../GpGFX.ahk
 
     ; 1. Create a modern dark glass HUD card
     lyr := Layer(100, 100, 360, 180, "ReactiveDashboard")

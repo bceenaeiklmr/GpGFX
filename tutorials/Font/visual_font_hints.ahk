@@ -5,7 +5,7 @@
 
 #Requires AutoHotkey v2
 #Warn All, StdOut
-#include ../../../GpGFX.ahk
+#include ../../GpGFX.ahk
 
 ; Create a test layer showing all TextRenderingHint modes for default Segoe UI 10
 lyr := Layer(600, 400)
